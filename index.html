@@ -5,583 +5,473 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>재난 대피 경로 찾기 · BFS 시뮬레이터</title>
 <style>
-  /* ===== 기본 색과 글꼴 ===== */
+  /* ===== 색과 기본 글꼴 ===== */
   :root {
     color-scheme: light;
-    --bg: #f3f5f9;
-    --card: #ffffff;
-    --line: #e2e6ee;
-    --line-strong: #cbd3e0;
-    --text: #1c2333;
-    --muted: #5f6b80;
-    --accent: #2f6fed;
-    --accent-soft: #eaf1ff;
+    --bg: #f5f6f8;
+    --surface: #ffffff;
+    --soft: #f1f3f6;
+    --line: #e6e8ee;
+    --line-2: #d5d9e2;
+    --text: #0f172a;
+    --text-2: #334155;
+    --muted: #64748b;
+    --primary: #111827;
+    --primary-h: #1f2937;
 
-    /* 칸 상태별 색 */
-    --c-empty: #ffffff;
-    --c-start: #34b864;
-    --c-exit: #3b82f6;
-    --c-wall: #374151;
-    --c-queue: #fde68a;
-    --c-queue-line: #e3b62f;
-    --c-current: #fb923c;
-    --c-current-line: #c2410c;
-    --c-done: #ccf3e7;
-    --c-done-line: #9fdcc8;
-    --c-path: #8b5cf6;
-    --c-path-line: #6d3fe0;
-    --c-next: #b45309;
+    /* 칸 상태 색 */
+    --c-start: #22c55e;  --c-start-d: #16a34a;
+    --c-exit: #3b82f6;   --c-exit-d: #2563eb;
+    --c-wall: #334155;
+    --c-queue: #fde68a;  --c-queue-d: #e5b80b;
+    --c-cur: #fb923c;    --c-cur-d: #ea580c;
+    --c-done: #d3f4ec;   --c-done-d: #a7e3d4;
+    --c-path: #8b5cf6;   --c-path-d: #7c3aed;
 
-    --radius: 14px;
-    --shadow: 0 1px 2px rgba(20, 30, 50, .05), 0 4px 14px rgba(20, 30, 50, .05);
+    --r-lg: 18px;
+    --r-md: 12px;
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
-  html { -webkit-text-size-adjust: 100%; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
   body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
+    margin: 0; background: var(--bg); color: var(--text);
     font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, -apple-system, "Segoe UI", sans-serif;
-    font-size: 15px;
-    line-height: 1.55;
+    font-size: 15px; line-height: 1.6;
   }
-  b, strong { font-weight: 700; }
+  button, select, input { font: inherit; }
+  :focus-visible { outline: 3px solid rgba(79, 70, 229, .35); outline-offset: 2px; }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 0 24px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); min-width: 0; }
 
   /* ===== 머리말 ===== */
-  .top { background: linear-gradient(135deg, #1d2a4b, #2d4278); color: #fff; }
-  .top-inner {
-    max-width: 1440px; margin: 0 auto; padding: 16px 24px 14px;
-    display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: center; justify-content: space-between;
+  .top { padding: 26px 0 18px; }
+  .top-inner { display: flex; align-items: center; gap: 14px; }
+  .logo { flex: none; width: 46px; height: 46px; border-radius: 14px; background: var(--primary); display: grid; place-items: center; font-size: 23px; }
+  h1 { font-size: 23px; font-weight: 800; letter-spacing: -0.02em; margin: 0; line-height: 1.3; }
+  .top p { margin: 2px 0 0; color: var(--muted); font-size: 14px; word-break: keep-all; }
+  .top-nav { margin-left: auto; display: flex; gap: 6px; flex: none; }
+  .top-nav a {
+    text-decoration: none; color: var(--text-2); font-size: 13.5px; font-weight: 600;
+    padding: 7px 13px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line);
   }
-  .brand { display: flex; gap: 14px; align-items: center; min-width: 0; }
-  .brand-icon {
-    flex: none; width: 56px; height: 56px; display: grid; place-items: center;
-    font-size: 32px; background: rgba(255, 255, 255, .12); border-radius: 16px;
-  }
-  h1 { font-size: 24px; margin: 0; letter-spacing: -0.01em; line-height: 1.3; }
-  h1 span { font-weight: 500; opacity: .8; font-size: 18px; margin-left: 4px; }
-  .brand p { margin: 4px 0 0; opacity: .85; font-size: 14px; max-width: 620px; }
-  .assume {
-    background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .18);
-    border-radius: 12px; padding: 10px 14px; max-width: 600px;
-  }
-  .assume strong { font-size: 13px; display: block; margin-bottom: 6px; opacity: .9; }
-  .assume ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
-  .assume li { font-size: 12.5px; background: rgba(255, 255, 255, .13); padding: 3px 10px; border-radius: 999px; }
+  .top-nav a:hover { border-color: var(--line-2); }
 
-  /* ===== 전체 배치 (PC: 3단, 중간 화면: 2단 + 정보 아래로, 좁은 화면: 1단으로 쌓기) ===== */
-  .layout {
-    max-width: 1440px; margin: 0 auto; padding: 18px 24px 8px;
-    display: grid; gap: 16px; align-items: start;
-    grid-template-columns: 272px minmax(0, 1fr) 360px;
-  }
-  .col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-  .g-info { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-
-  @media (max-width: 1200px) {
-    .layout { grid-template-columns: 272px minmax(0, 1fr); }
-    .g-info { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
-    .g-info > .wide { grid-column: 1 / -1; }
-  }
-  @media (max-width: 820px) {
-    .top-inner { padding: 16px 16px 14px; }
+  /* ===== 시뮬레이터 배치: 왼쪽 지도, 오른쪽 실행·설명 ===== */
+  .app { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
+  .side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  @media (max-width: 980px) { .app { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 640px) {
+    .wrap { padding: 0 16px; }
+    .top { padding: 18px 0 14px; }
+    .top-nav { display: none; }
     h1 { font-size: 20px; }
-    h1 span { display: block; margin-left: 0; font-size: 15px; }
-    .layout { padding: 14px 16px 4px; grid-template-columns: minmax(0, 1fr); }
-    .g-info { grid-template-columns: minmax(0, 1fr); }
   }
 
-  /* ===== 카드(패널) 공통 ===== */
-  .panel {
-    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-    box-shadow: var(--shadow); padding: 16px; min-width: 0;
+  /* ===== 지도 영역 ===== */
+  .stage { padding: 18px 20px 18px; }
+  .bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 14px; }
+  .bar + .bar { margin-top: 12px; }
+  .bar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .field { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); font-weight: 600; }
+  .select {
+    appearance: none; -webkit-appearance: none; border: 1px solid transparent; border-radius: 10px;
+    background: var(--soft) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2364748b' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 11px center;
+    padding: 8px 32px 8px 12px; font-size: 14px; font-weight: 600; color: var(--text); cursor: pointer; max-width: 100%;
   }
-  .panel h2 { font-size: 16px; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
-  .no {
-    display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 7px;
-    background: var(--accent); color: #fff; font-size: 13px; flex: none;
+  .select:hover { border-color: var(--line-2); }
+  .select.sm { padding: 8px 26px 8px 11px; background-position: right 9px center; }
+  .times { color: var(--muted); font-weight: 600; }
+  .icon-btn {
+    width: 38px; height: 38px; border-radius: 10px; border: 1px solid transparent; background: var(--soft);
+    cursor: pointer; font-size: 16px; display: grid; place-items: center;
   }
+  .icon-btn:hover { border-color: var(--line-2); }
 
-  /* ===== 1. 지도 만들기 ===== */
-  .tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .tool {
-    display: flex; flex-direction: column; align-items: center; gap: 1px;
-    padding: 9px 6px; border: 1.5px solid var(--line); background: #fff; border-radius: 12px;
-    cursor: pointer; font: inherit; font-weight: 650; color: var(--text); transition: .15s;
-  }
-  .tool .emo { font-size: 24px; line-height: 1.15; }
-  .tool small { font-weight: 500; color: var(--muted); font-size: 11.5px; }
-  .tool:hover { border-color: var(--line-strong); background: #fafbfd; }
-  .tool[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 3px rgba(47, 111, 237, .15); }
-  .hint { font-size: 12.5px; color: var(--muted); margin: 10px 0 12px; min-height: 3.9em; }
-  .field { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
-  .field-label { font-size: 13px; font-weight: 650; color: var(--muted); }
-  .seg { display: inline-flex; background: #eef1f6; border-radius: 10px; padding: 3px; gap: 2px; }
+  .seg { display: inline-flex; flex-wrap: wrap; background: var(--soft); padding: 4px; border-radius: 12px; gap: 2px; }
   .seg button {
-    border: 0; background: transparent; padding: 6px 10px; border-radius: 8px;
-    font: inherit; font-size: 13px; font-weight: 650; color: var(--muted); cursor: pointer;
+    border: 0; background: transparent; padding: 7px 13px; border-radius: 9px; cursor: pointer;
+    font-size: 14px; font-weight: 600; color: var(--muted); display: inline-flex; align-items: center; gap: 6px;
   }
-  .seg button[aria-pressed="true"] { background: #fff; color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
-
-  /* ===== 버튼 공통 ===== */
-  .btn {
-    font: inherit; font-weight: 650; font-size: 14px; padding: 10px 12px; border-radius: 10px;
-    border: 1px solid var(--line-strong); background: #fff; color: var(--text); cursor: pointer;
-    transition: .15s; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  }
-  .btn:hover:not(:disabled) { background: #f4f6fa; }
-  .btn:disabled { opacity: .45; cursor: not-allowed; }
-  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .btn.primary:hover:not(:disabled) { background: #245ed1; }
-  .btn.playing { background: #fff4e0; border-color: #f0b04a; color: #8a4b00; }
-  .btn.wide { width: 100%; }
-  .btn:focus-visible, .tool:focus-visible, .seg button:focus-visible, .ex:focus-visible, input:focus-visible {
-    outline: 3px solid rgba(47, 111, 237, .45); outline-offset: 2px;
+  .seg button:hover { color: var(--text); }
+  .seg button[aria-pressed="true"] { background: #fff; color: var(--text); box-shadow: 0 1px 2px rgba(15, 23, 42, .1), 0 0 0 1px rgba(15, 23, 42, .05); }
+  .tool-hint { font-size: 13px; color: var(--muted); }
+  @media (max-width: 640px) {                                         /* 휴대폰: 도구 4개를 한 줄에 */
+    .stage { padding: 16px 14px; }
+    .seg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; }
+    .seg button { justify-content: center; padding: 7px 2px; font-size: 13px; gap: 4px; }
   }
 
-  /* ===== 2. 예시 불러오기 ===== */
-  .examples { display: flex; flex-direction: column; gap: 6px; }
-  .ex {
-    display: flex; justify-content: space-between; align-items: baseline; gap: 8px; text-align: left;
-    padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff;
-    font: inherit; cursor: pointer; color: var(--text); transition: .15s;
-  }
-  .ex b { font-weight: 650; font-size: 14px; white-space: nowrap; }
-  .ex span { font-size: 12px; color: var(--muted); text-align: right; }
-  .ex:hover { border-color: var(--line-strong); background: #fafbfd; }
-  .ex.active { border-color: var(--accent); background: var(--accent-soft); }
-
-  /* ===== 3. 탐색 실행 (격자 바로 위) ===== */
-  .g-run { container-type: inline-size; }
-  .run-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 12px; }
-  .run-head h2 { margin: 0; }
-  .speed { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted); font-weight: 650; }
-  .speed input { width: 140px; accent-color: var(--accent); margin: 0; }
-  .speed output { color: var(--text); font-variant-numeric: tabular-nums; min-width: 8.6em; }
-  .run-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-  .run-grid .btn { white-space: nowrap; }
-  @container (max-width: 560px) {
-    .run-grid { grid-template-columns: 1fr 1fr; }
-    .speed { width: 100%; }
-    .speed input { flex: 1; width: auto; min-width: 0; }
-  }
-
-  /* ===== 상태 메시지 ===== */
-  .status { padding: 10px 14px; border-radius: 12px; font-size: 14px; border: 1px solid; margin-top: 12px; word-break: keep-all; overflow-wrap: anywhere; }
-  .status.info { background: #eef4ff; border-color: #d3e0fb; color: #1e3a7a; }
-  .status.warn { background: #fff6e5; border-color: #f6d9a0; color: #7a4300; }
-  .status.ok { background: #ecfaf1; border-color: #bfe9cf; color: #17532f; }
-  .status.bad { background: #fdeeee; border-color: #f3c7c7; color: #7f1d1d; }
-  .status.shake { animation: shake .4s; }
-
-  /* ===== 격자 지도 ===== */
-  .board-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 10px; }
-  .board-head h2 { margin: 0; }
-  .board-head span { font-size: 12.5px; color: var(--muted); }
-  /* 격자는 화면 높이에도 맞춰 너무 커지지 않게 (노트북 화면에서 한눈에 보이도록) */
+  /* 격자: 칸 크기는 화면 높이·행 수에 맞추고, 가로가 좁으면 가로에 맞춰 줄어든다 */
   .board-wrap {
-    --n: 5; container-type: inline-size; width: 100%; margin: 0 auto;
-    max-width: var(--board-max, 420px);
-    max-width: min(var(--board-max, 420px), max(340px, calc(100vh - 390px)));
+    --rows: 5; --cols: 5;
+    --cell: 64px;
+    --cell: clamp(26px, calc((100vh - 270px) / var(--rows) - 3px), 72px);
+    container-type: inline-size; width: 100%; margin: 18px auto 0;
+    max-width: calc(22px + var(--cols) * (var(--cell) + 3px));
   }
-  .board-wrap[data-n="5"] { --board-max: 420px; }
-  .board-wrap[data-n="7"] { --board-max: 490px; }
-  .board-wrap[data-n="10"] { --board-max: 580px; }
   .board {
-    display: grid; grid-template-columns: 22px repeat(var(--n), minmax(0, 1fr)); gap: 3px;
+    --cs: calc((100cqw - 22px) / var(--cols) - 3px);   /* 칸 한 변의 실제 길이 */
+    display: grid; grid-template-columns: 22px repeat(var(--cols), minmax(0, 1fr)); gap: 3px;
     touch-action: none; user-select: none; -webkit-user-select: none;
   }
-  .hdr { display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--muted); font-weight: 650; font-variant-numeric: tabular-nums; }
-  .hdr.col { padding-bottom: 2px; }
+  .hdr { display: flex; align-items: center; justify-content: center; font-size: 11.5px; color: #94a3b8; font-weight: 600; font-variant-numeric: tabular-nums; }
   .cell {
-    position: relative; aspect-ratio: 1 / 1; min-width: 0; border-radius: 6px;
-    background: var(--c-empty); border: 1px solid var(--line);
+    position: relative; aspect-ratio: 1 / 1; min-width: 0; border-radius: 7px; background: #fff; border: 1px solid var(--line);
     display: flex; align-items: center; justify-content: center; cursor: crosshair;
     transition: background-color .2s, box-shadow .2s, border-color .2s;
   }
-  .cell:hover { border-color: #8f9bb0; }
-  .cell .icon {
-    pointer-events: none; line-height: 1;
-    font-size: 22px; font-size: calc((100cqw - 50px) / var(--n) * .5);
-  }
+  .cell:hover { border-color: #94a3b8; }
+  .cell .icon { pointer-events: none; line-height: 1; font-size: 22px; font-size: calc(var(--cs) * .48); }
   .cell .num {
-    pointer-events: none; font-weight: 700; font-variant-numeric: tabular-nums; color: #3a4356;
-    font-size: 13px; font-size: clamp(10px, calc((100cqw - 50px) / var(--n) * .34), 22px);
+    pointer-events: none; font-weight: 650; font-variant-numeric: tabular-nums; color: #475569;
+    font-size: 13px; font-size: clamp(10px, calc(var(--cs) * .34), 21px);
   }
-  /* 출발점·출구 칸의 거리는 왼쪽 위 작은 표로 */
-  .t-start .num:not(:empty), .t-exit .num:not(:empty) {
-    position: absolute; top: 2px; left: 2px; background: rgba(255, 255, 255, .94); color: #1c2333;
+  .t-start .num:not(:empty), .t-exit .num:not(:empty) {          /* 출발점·출구의 거리는 왼쪽 위에 작게 */
+    position: absolute; top: 2px; left: 2px; background: rgba(255, 255, 255, .94); color: var(--text);
     border-radius: 5px; padding: 0 4px; line-height: 1.35;
-    font-size: 10px; font-size: clamp(9px, calc((100cqw - 50px) / var(--n) * .22), 13px);
+    font-size: 10px; font-size: clamp(9px, calc(var(--cs) * .22), 12px);
   }
-
-  /* 칸 종류 */
   .cell.t-wall { background: var(--c-wall); border-color: var(--c-wall); }
-  .cell.t-start { background: var(--c-start); border-color: #23944c; }
-  .cell.t-exit { background: var(--c-exit); border-color: #2563eb; }
-
-  /* 빈 칸의 탐색 상태 */
-  .cell.t-empty.st-queue { background: var(--c-queue); border-color: var(--c-queue-line); }
-  .cell.t-empty.st-done { background: var(--c-done); border-color: var(--c-done-line); }
-  .cell.t-empty.st-current { background: var(--c-current); border-color: var(--c-current-line); box-shadow: 0 0 0 3px var(--c-current-line); }
+  .cell.t-start { background: var(--c-start); border-color: var(--c-start-d); }
+  .cell.t-exit { background: var(--c-exit); border-color: var(--c-exit-d); }
+  .cell.t-empty.st-queue { background: var(--c-queue); border-color: var(--c-queue-d); }
+  .cell.t-empty.st-done { background: var(--c-done); border-color: var(--c-done-d); }
+  .cell.t-empty.st-current { background: var(--c-cur); border-color: var(--c-cur-d); box-shadow: 0 0 0 2px var(--c-cur-d); }
   .cell.t-empty.st-current .num { color: #fff; }
-  .cell.t-empty.st-path {
-    background: var(--c-path); border-color: var(--c-path-line);
-    animation: pathIn .4s both; animation-delay: calc(var(--i, 0) * 60ms);
-  }
+  .cell.t-empty.st-path { background: var(--c-path); border-color: var(--c-path-d); animation: pathIn .4s both; animation-delay: calc(var(--i, 0) * 60ms); }
   .cell.t-empty.st-path .num { color: #fff; animation: numIn .4s both; animation-delay: calc(var(--i, 0) * 60ms); }
-
-  /* 출발점·출구는 고유 색을 지키고, 탐색 상태는 안쪽 테두리로 표시 */
-  .cell.t-start.st-queue, .cell.t-exit.st-queue { box-shadow: inset 0 0 0 4px var(--c-queue); }
-  .cell.t-start.st-done, .cell.t-exit.st-done { box-shadow: inset 0 0 0 4px var(--c-done); }
-  .cell.t-start.st-current, .cell.t-exit.st-current { box-shadow: inset 0 0 0 4px var(--c-current), 0 0 0 3px var(--c-current-line); }
-  .cell.t-start.st-path, .cell.t-exit.st-path {
-    box-shadow: inset 0 0 0 4px #c4b5fd, 0 0 0 3px var(--c-path-line);
-    animation: ringIn .4s both; animation-delay: calc(var(--i, 0) * 60ms);
-  }
+  .cell.t-start.st-queue, .cell.t-exit.st-queue { box-shadow: inset 0 0 0 3px var(--c-queue); }
+  .cell.t-start.st-done, .cell.t-exit.st-done { box-shadow: inset 0 0 0 3px var(--c-done); }
+  .cell.t-start.st-current, .cell.t-exit.st-current { box-shadow: inset 0 0 0 3px var(--c-cur), 0 0 0 2px var(--c-cur-d); }
+  .cell.t-start.st-path, .cell.t-exit.st-path { box-shadow: 0 0 0 3px var(--c-path); animation: ringIn .4s both; animation-delay: calc(var(--i, 0) * 60ms); }
   .cell.st-current { z-index: 2; animation: pop .35s ease; }
   .cell.st-path { z-index: 1; }
-  /* 다음에 꺼낼 칸(큐 맨 앞) = 점선 */
-  .cell.st-next::after {
-    content: ""; position: absolute; inset: 3px; border: 2px dashed var(--c-next); border-radius: 5px; pointer-events: none;
+  .cell.walker::before {                                             /* 경로를 따라 달려가는 대피자 */
+    content: "🏃"; position: absolute; inset: 0; display: grid; place-items: center; z-index: 3;
+    font-size: calc(var(--cs) * .55); line-height: 1; animation: hop .2s ease;
   }
+  .cell.walker .icon, .cell.walker .num { visibility: hidden; }
+  .cell.arrived { animation: arrive .7s ease; }
 
-  /* 범례 */
-  .legend {
-    list-style: none; padding: 0; margin: 16px 0 0; display: flex; flex-wrap: wrap; gap: 8px 14px;
-    justify-content: center; font-size: 13px; color: var(--muted);
-  }
-  .legend li { display: flex; align-items: center; gap: 6px; }
-  .sw {
-    flex: none; width: 20px; height: 20px; border-radius: 5px; display: inline-grid; place-items: center;
-    font-size: 11px; font-style: normal; border: 1px solid rgba(0, 0, 0, .08);
-  }
-  .sw.start { background: var(--c-start); }
-  .sw.exit { background: var(--c-exit); }
-  .sw.wall { background: var(--c-wall); }
-  .sw.queue { background: var(--c-queue); border-color: var(--c-queue-line); }
-  .sw.current { background: var(--c-current); box-shadow: 0 0 0 2px var(--c-current-line); }
-  .sw.done { background: var(--c-done); border-color: var(--c-done-line); }
-  .sw.path { background: var(--c-path); }
-  .sw.next { background: #fff; border: 2px dashed var(--c-next); }
-  .sw.num { background: #fff; font-weight: 700; color: #3a4356; font-size: 12px; border-color: var(--line-strong); }
+  .legend { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; font-size: 12.5px; color: var(--muted); }
+  .legend li { display: inline-flex; align-items: center; gap: 6px; }
+  .sw { width: 12px; height: 12px; border-radius: 4px; display: inline-block; }
 
-  /* ===== 오른쪽 정보 패널 ===== */
-  .box {
-    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-    box-shadow: var(--shadow); padding: 14px 16px; min-width: 0;
+  /* ===== 실행 버튼 ===== */
+  .controls { padding: 16px; }
+  .btn {
+    border-radius: 12px; padding: 10px 12px; border: 1px solid var(--line-2); background: #fff; color: var(--text);
+    font-size: 14px; font-weight: 650; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    transition: background-color .15s, border-color .15s, opacity .15s; white-space: nowrap;
   }
-  .box h3 { font-size: 14.5px; margin: 0 0 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .box h3 small { font-weight: 500; color: var(--muted); font-size: 12px; }
-  .badge { font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: #eef1f6; color: var(--muted); white-space: nowrap; }
-  .badge.run { background: #fff1e4; color: #b45309; }
-  .badge.ok { background: #efe9ff; color: #5b30c9; }
-  .badge.bad { background: #fdeeee; color: #9f1d1d; }
-  .step-text { margin: 0; font-size: 14.5px; word-break: keep-all; overflow-wrap: anywhere; }
-  .step-text b { white-space: nowrap; }
-  .step-note { margin: 8px 0 0; font-size: 13px; padding: 8px 10px; border-radius: 8px; background: #eef4ff; color: #1e3a7a; word-break: keep-all; }
-  .checks-title { font-size: 12px; color: var(--muted); margin: 12px 0 0; font-weight: 650; }
-  .checks { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; }
-  .checks li {
-    display: grid; grid-template-columns: 46px 64px minmax(0, 1fr); gap: 6px; align-items: center;
-    font-size: 13px; padding: 5px 8px; border-radius: 8px; background: #f6f8fb;
-  }
-  .checks .dir { font-weight: 700; }
-  .checks .co { font-variant-numeric: tabular-nums; color: var(--muted); }
-  .checks li.add { background: #fff8d9; }
-  .checks li.out { color: #98a2b3; }
+  .btn:hover:not(:disabled) { background: var(--soft); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn.primary { width: 100%; padding: 13px; font-size: 15.5px; background: var(--primary); border-color: var(--primary); color: #fff; }
+  .btn.primary:hover:not(:disabled) { background: var(--primary-h); }
+  .btn.primary.playing { background: #fff; color: var(--text); border-color: var(--line-2); }
+  .btn.primary.playing:hover { background: var(--soft); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  .speed { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 13px; color: var(--muted); font-weight: 600; }
+  .speed input { flex: 1; min-width: 0; accent-color: var(--primary); margin: 0; }
 
-  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-  .stat { background: #f6f8fb; border-radius: 10px; padding: 8px 6px; text-align: center; }
-  .stat b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; line-height: 1.25; }
-  .stat span { display: block; font-size: 12.5px; font-weight: 650; }
-  .stat small { display: block; font-size: 11px; color: var(--muted); line-height: 1.3; }
+  /* ===== 결과 ===== */
+  .result { padding: 16px; }
+  .result.ok { border-color: #ddd3fe; background: linear-gradient(180deg, #faf8ff, #fff 70%); }
+  .result.bad { border-color: #f6cccc; background: linear-gradient(180deg, #fff6f6, #fff 70%); }
+  .result h3 { font-size: 16px; margin: 0 0 12px; }
+  .kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .kpis.one { grid-template-columns: minmax(0, 1fr); }
+  .kpi { background: var(--soft); border-radius: 12px; padding: 9px 10px; }
+  .kpi span { display: block; font-size: 11.5px; color: var(--muted); font-weight: 600; }
+  .kpi b { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .kpi.main { background: #ede9fe; }
+  .kpi.main b { color: #6d28d9; }
+  .result.bad .kpi.main { background: #fdecec; }
+  .result.bad .kpi.main b { color: #b91c1c; }
+  .path-list { margin: 12px 0 0; font-size: 13px; line-height: 1.8; color: var(--text-2); font-variant-numeric: tabular-nums; word-break: keep-all; }
+  .match { margin: 10px 0 0; font-size: 13px; font-weight: 650; color: #15803d; word-break: keep-all; }
+  .match.diff { color: #b45309; }
+  .reality { margin: 6px 0 0; font-size: 12.5px; color: var(--muted); word-break: keep-all; }
 
-  .queue-list {
-    list-style: none; margin: 0; padding: 16px 0 0; display: flex; flex-wrap: wrap; gap: 6px; min-height: 48px;
-  }
+  /* ===== 탐색 과정 설명 ===== */
+  .narr { padding: 16px; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .label { font-size: 12.5px; font-weight: 700; color: var(--muted); }
+  .badge { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--soft); color: var(--muted); white-space: nowrap; }
+  .badge.run { background: #fff1e6; color: #c2410c; }
+  .badge.ok { background: #f1ecff; color: #6d28d9; }
+  .badge.bad { background: #fdecec; color: #b91c1c; }
+  .badge.warn { background: #fff6db; color: #a16207; }
+  .narr-text { margin: 0; font-size: 15px; line-height: 1.65; color: var(--text-2); word-break: keep-all; overflow-wrap: anywhere; }
+  .narr-text b { color: var(--text); white-space: nowrap; }
+  .narr-text .sub { display: block; margin-top: 6px; font-size: 13px; color: var(--muted); }
+  .narr-note { margin: 10px 0 0; font-size: 13px; padding: 9px 11px; border-radius: 10px; background: #f5f3ff; color: #5b21b6; word-break: keep-all; }
+  .narr.shake { animation: shake .4s; }
+  .divider { height: 1px; background: var(--line); margin: 14px 0 12px; }
+  .queue-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 5px; min-height: 28px; }
   .queue-list li {
-    position: relative; font-variant-numeric: tabular-nums; font-size: 13px; padding: 3px 9px; border-radius: 8px;
-    background: #fff8d6; border: 1px solid #f1d77c; white-space: nowrap;
+    font-size: 12.5px; font-variant-numeric: tabular-nums; padding: 3px 8px; border-radius: 7px;
+    background: #fffbea; border: 1px solid #f3e3a1; color: var(--text-2); white-space: nowrap;
   }
-  .queue-list li.front { background: var(--c-queue); border-color: #d97706; font-weight: 700; box-shadow: 0 0 0 2px rgba(217, 119, 6, .22); }
-  .queue-list li.front::before { content: "맨 앞"; position: absolute; top: -17px; left: 0; font-size: 10.5px; font-weight: 700; color: var(--c-next); }
+  .queue-list li.front { background: var(--c-queue); border-color: var(--c-queue-d); color: var(--text); font-weight: 700; }
   .queue-list li.new { animation: slideIn .35s ease; }
-  .queue-list li.empty { background: transparent; border: 0; color: var(--muted); padding: 3px 0; white-space: normal; }
-  .queue-cap { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
-
-  .log {
-    list-style: none; margin: 0; padding: 0; max-height: 260px; overflow-y: auto;
-    font-size: 13px; font-variant-numeric: tabular-nums; border: 1px solid var(--line); border-radius: 10px;
-  }
-  .log li { padding: 5px 10px; border-bottom: 1px solid #f0f2f6; }
+  .queue-list li.empty { background: none; border: 0; padding: 3px 0; color: var(--muted); white-space: normal; }
+  .stats { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 12px; font-size: 12.5px; color: var(--muted); }
+  .stats b { color: var(--text); font-size: 14px; margin-left: 3px; font-variant-numeric: tabular-nums; }
+  .log-wrap { margin-top: 10px; }
+  .log-wrap summary { font-size: 12.5px; color: var(--muted); cursor: pointer; font-weight: 600; }
+  .log { list-style: none; margin: 8px 0 0; padding: 0; max-height: 200px; overflow-y: auto; font-size: 12.5px; font-variant-numeric: tabular-nums; border: 1px solid var(--line); border-radius: 10px; }
+  .log li { padding: 4px 10px; border-bottom: 1px solid #f1f3f6; }
   .log li:last-child { border-bottom: 0; }
-  .log li.now { background: #fff1e4; font-weight: 650; }
-  .log li.found { background: #f1ecff; color: #4c1d95; font-weight: 700; }
-  .log li.nopath { background: #fdeeee; color: #7f1d1d; font-weight: 700; }
+  .log li.now { background: #fff6ee; font-weight: 650; }
+  .log li.found { color: #6d28d9; font-weight: 700; }
+  .log li.nopath { color: #b91c1c; font-weight: 700; }
   .log li.empty { color: var(--muted); }
 
-  /* 결과 */
-  .result { border-radius: var(--radius); padding: 14px 16px; border: 1px solid; box-shadow: var(--shadow); }
-  .result.ok { background: #f6f2ff; border-color: #d9ccff; }
-  .result.bad { background: #fff3f3; border-color: #f3c7c7; }
-  .result h3 { margin: 0 0 10px; font-size: 16px; }
-  .facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
-  .facts.one { grid-template-columns: minmax(0, 1fr); }
-  .facts div { background: #fff; border-radius: 10px; padding: 8px 10px; }
-  .facts dt { font-size: 11.5px; color: var(--muted); font-weight: 650; }
-  .facts dd { margin: 0; font-size: 17px; font-weight: 750; font-variant-numeric: tabular-nums; }
-  .facts dd small { font-size: 12px; font-weight: 500; color: var(--muted); }
-  .result .sub { font-size: 12.5px; color: var(--muted); margin: 8px 0 0; }
-  .path-title { font-size: 12.5px; font-weight: 700; margin: 12px 0 4px; color: #4c1d95; }
-  .path-list {
-    margin: 0; font-size: 13.5px; line-height: 1.8; background: #fff; padding: 8px 10px; border-radius: 10px;
-    font-variant-numeric: tabular-nums; word-break: keep-all;
+  /* ===== 원리 설명 ===== */
+  .section { margin-top: 56px; }
+  .section-title { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; margin: 0 0 4px; }
+  .section-lead { color: var(--muted); margin: 0 0 18px; font-size: 14px; word-break: keep-all; }
+  .learn-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
+  @media (max-width: 980px) { .learn-grid { grid-template-columns: minmax(0, 1fr); } }
+  .learn { padding: 20px; }
+  .learn h3 { font-size: 16.5px; margin: 0 0 8px; letter-spacing: -0.01em; }
+  .learn p { font-size: 14px; color: var(--text-2); margin: 0 0 12px; word-break: keep-all; }
+  .fig { margin: 0 0 14px; padding: 14px 10px 10px; background: var(--soft); border-radius: 14px; }
+  .fig figcaption { text-align: center; font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.45; word-break: keep-all; }
+  .mini, .wave { display: grid; gap: 3px; justify-content: center; }
+  .mini i, .wave i {
+    font-style: normal; width: 24px; height: 24px; border-radius: 5px; display: grid; place-items: center;
+    font-size: 11.5px; font-weight: 700; color: #475569; background: #fff; border: 1px solid var(--line); line-height: 1;
   }
-  .match { margin: 10px 0 0; font-size: 13px; font-weight: 650; padding: 6px 10px; border-radius: 8px; background: #ecfaf1; color: #17532f; word-break: keep-all; }
-  .nw { white-space: nowrap; }
-  .match.diff { background: #fff6e5; color: #7a4300; }
+  .wave { grid-template-columns: repeat(5, 24px); }
+  .wave i { border: 0; color: #0f3b33; }
+  .mini i.k-S { background: var(--c-start); border-color: var(--c-start-d); font-size: 13px; }
+  .mini i.k-E { background: var(--c-exit); border-color: var(--c-exit-d); font-size: 13px; }
+  .mini i.k-W { background: var(--c-wall); border-color: var(--c-wall); font-size: 12px; }
+  .mini i.k-m { background: var(--c-path); border-color: var(--c-path-d); font-size: 12px; }
+  .mini i.k-p { background: var(--c-path); border-color: var(--c-path-d); color: #fff; }
+  .mini i.k-g { background: #dcfce7; border: 2px dashed #22a35a; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips span { font-size: 12.5px; padding: 4px 10px; border-radius: 999px; background: var(--soft); color: var(--text-2); font-weight: 600; }
+  .steps { list-style: none; counter-reset: s; padding: 0; margin: 0 0 12px; display: grid; gap: 8px; }
+  .steps li { counter-increment: s; display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; font-size: 14px; color: var(--text-2); word-break: keep-all; }
+  .steps li::before {
+    content: counter(s); width: 22px; height: 22px; margin-top: 1px; border-radius: 7px; background: var(--primary); color: #fff;
+    display: grid; place-items: center; font-size: 12px; font-weight: 700;
+  }
+  .note { font-size: 13px; background: #f5f3ff; color: #5b21b6; border-radius: 10px; padding: 9px 11px; margin: 0 !important; word-break: keep-all; }
+  .limits { padding-left: 18px; margin: 0 0 12px; }
+  .limits li { font-size: 13.5px; color: var(--text-2); margin: 4px 0; word-break: keep-all; }
+  .conclusion { background: var(--primary); color: #fff !important; border-radius: 12px; padding: 11px 13px; font-weight: 650; margin: 0 !important; }
 
-  /* ===== 설명 카드 ===== */
-  .explain { max-width: 1440px; margin: 0 auto; padding: 18px 24px 8px; }
-  .explain > h2 { font-size: 19px; margin: 6px 0 12px; }
-  .cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start; }
-  @media (max-width: 1200px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  @media (max-width: 680px) { .cards { grid-template-columns: minmax(0, 1fr); } .explain { padding: 14px 16px 4px; } }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; min-width: 0; }
-  .card h3 { margin: 0 0 10px; font-size: 16px; display: flex; gap: 10px; align-items: center; }
-  .card .ico { flex: none; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-size: 18px; background: #eef4ff; }
-  .card p, .card li { font-size: 14px; word-break: keep-all; }
-  .card p { margin: 0 0 10px; }
-  .card ul { padding-left: 18px; margin: 6px 0 12px; }
-  .card li { margin: 5px 0; }
-  .wave { display: grid; grid-template-columns: repeat(5, 28px); gap: 3px; justify-content: center; margin: 4px 0 6px; }
-  .wave i {
-    font-style: normal; width: 28px; height: 28px; border-radius: 5px; display: grid; place-items: center;
-    font-size: 12px; font-weight: 700; color: #0f3b33;
-  }
-  .wave-cap { text-align: center; font-size: 12px; color: var(--muted); margin: 0 0 12px !important; }
-  .mini-queue {
-    display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: 12.5px;
-    background: #f6f8fb; border-radius: 10px; padding: 10px; margin-top: 4px;
-  }
-  .mini-queue .chip { background: #fff8d6; border: 1px solid #f1d77c; padding: 2px 7px; border-radius: 6px; font-variant-numeric: tabular-nums; }
-  .mini-queue .chip.front { background: var(--c-queue); border-color: #d97706; font-weight: 700; }
-  .mini-queue .lbl { color: var(--muted); font-weight: 650; }
-  .callout { background: #fff6e5; border: 1px solid #f6d9a0; border-radius: 10px; padding: 9px 11px; font-size: 13.5px; margin: 0 0 10px; word-break: keep-all; }
-  .tip { background: #eef4ff; border-radius: 10px; padding: 9px 11px; font-size: 13.5px; word-break: keep-all; }
-  .conclusion { background: #1d2a4b; color: #fff; border-radius: 10px; padding: 10px 12px; font-weight: 650; font-size: 14px; word-break: keep-all; }
-  footer { text-align: center; color: var(--muted); font-size: 12.5px; padding: 18px 16px 28px; }
+  /* ===== 검증 (접어 두기) ===== */
+  details.verify { overflow: hidden; }
+  details.verify > summary { list-style: none; display: flex; align-items: center; gap: 12px; padding: 16px 20px; cursor: pointer; }
+  details.verify > summary::-webkit-details-marker { display: none; }
+  .sum-title { font-weight: 700; font-size: 15px; }
+  .pass { font-size: 12.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: #e8f7ee; color: #15803d; }
+  .pass.fail { background: #fdecec; color: #b91c1c; }
+  .chev { margin-left: auto; color: var(--muted); transition: transform .2s; }
+  details[open] .chev { transform: rotate(180deg); }
+  .verify-body { border-top: 1px solid var(--line); }
+  .verify-body > p { margin: 0; padding: 12px 20px; font-size: 13px; color: var(--muted); word-break: keep-all; }
+  .table-wrap { overflow-x: auto; }
+  table.tests { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 720px; }
+  .tests th, .tests td { padding: 10px 14px; text-align: left; vertical-align: top; border-top: 1px solid #f0f2f5; word-break: keep-all; }
+  .tests th { font-size: 12px; color: var(--muted); font-weight: 700; background: #fafbfc; white-space: nowrap; }
+  .tests td small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .tests .t-name { font-weight: 700; white-space: nowrap; }
+  .tests .ok { text-align: center; font-weight: 800; color: #15803d; }
+  .tests .ok.no { color: #b91c1c; }
+  .link-btn { border: 0; background: none; color: #4f46e5; font-weight: 650; font-size: 12.5px; cursor: pointer; padding: 0; white-space: nowrap; }
+  .link-btn:hover { text-decoration: underline; }
 
-  /* ===== 움직임 효과 ===== */
-  @keyframes pop { 0% { transform: scale(.86); } 60% { transform: scale(1.08); } 100% { transform: scale(1); } }
-  @keyframes pathIn {
-    from { background: var(--c-done); border-color: var(--c-done-line); transform: scale(.86); }
-    to { background: var(--c-path); border-color: var(--c-path-line); transform: scale(1); }
-  }
-  @keyframes numIn { from { color: #3a4356; } to { color: #fff; } }
-  @keyframes ringIn { from { box-shadow: inset 0 0 0 4px var(--c-done); } }
+  footer { text-align: center; color: var(--muted); font-size: 12.5px; padding: 36px 16px 40px; word-break: keep-all; }
+
+  /* ===== 움직임 ===== */
+  @keyframes pop { 0% { transform: scale(.86); } 60% { transform: scale(1.07); } 100% { transform: scale(1); } }
+  @keyframes pathIn { from { background: var(--c-done); border-color: var(--c-done-d); transform: scale(.86); } to { background: var(--c-path); border-color: var(--c-path-d); transform: scale(1); } }
+  @keyframes numIn { from { color: #475569; } to { color: #fff; } }
+  @keyframes ringIn { from { box-shadow: 0 0 0 0 var(--c-path); } }
+  @keyframes hop { 0% { transform: translateY(-22%) scale(.9); } 100% { transform: none; } }
+  @keyframes arrive { 0% { transform: scale(1); } 35% { transform: scale(1.2); } 100% { transform: scale(1); } }
   @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
-  @keyframes slideIn { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: none; } }
+  @keyframes slideIn { from { opacity: 0; transform: translateX(6px); } to { opacity: 1; transform: none; } }
   @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
     *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0ms !important; transition: none !important; }
   }
 </style>
 </head>
 <body>
 
-<!-- ===== 머리말 + 단순화 가정 ===== -->
 <header class="top">
-  <div class="top-inner">
-    <div class="brand">
-      <div class="brand-icon" aria-hidden="true">🧭</div>
-      <div>
-        <h1>재난 대피 경로 찾기 <span>BFS 시뮬레이터</span></h1>
-        <p>화재나 붕괴가 일어난 건물에서, 출발점부터 가장 가까운 출구까지의 최단 경로를 너비 우선 탐색(BFS)으로 한 단계씩 찾아봐요.</p>
-      </div>
+  <div class="wrap top-inner">
+    <div class="logo" aria-hidden="true">🧭</div>
+    <div>
+      <h1>재난 대피 경로 찾기</h1>
+      <p>BFS(너비 우선 탐색)로 막힌 곳을 피해 가장 가까운 출구까지의 최단 경로를 찾아요.</p>
     </div>
-    <div class="assume">
-      <strong>📐 이 시뮬레이터의 단순화 가정</strong>
-      <ul>
-        <li>건물 평면 = 정사각형 격자</li>
-        <li>상·하·좌·우 4방향 이동 (대각선 ✕)</li>
-        <li>모든 칸 이동 비용 1</li>
-        <li>장애물은 탐색 중 고정</li>
-        <li>대피자 1명, 혼잡 없음</li>
-        <li>이웃 확인 순서: 위 → 아래 → 왼쪽 → 오른쪽</li>
-      </ul>
-    </div>
+    <nav class="top-nav" aria-label="바로 가기">
+      <a href="#learn">원리</a>
+      <a href="#verify">검증</a>
+    </nav>
   </div>
 </header>
 
-<main class="layout">
+<main class="wrap app">
 
-  <!-- ===== 왼쪽 열: 지도 만들기 + 예시 ===== -->
-  <div class="col">
-  <!-- ===== 1. 지도 만들기 ===== -->
-  <section class="panel g-map" aria-labelledby="h-map">
-    <h2 id="h-map"><span class="no">1</span>지도 만들기</h2>
-    <div class="tools" role="group" aria-label="그리기 도구">
-      <button type="button" class="tool" data-tool="start" aria-pressed="false"><span class="emo" aria-hidden="true">🧍</span>출발점<small>1개만</small></button>
-      <button type="button" class="tool" data-tool="exit" aria-pressed="false"><span class="emo" aria-hidden="true">🚪</span>출구<small>여러 개 가능</small></button>
-      <button type="button" class="tool" data-tool="wall" aria-pressed="false"><span class="emo" aria-hidden="true">🔥</span>장애물<small>드래그 가능</small></button>
-      <button type="button" class="tool" data-tool="erase" aria-pressed="false"><span class="emo" aria-hidden="true">🧽</span>지우개<small>드래그 가능</small></button>
-    </div>
-    <p class="hint" id="toolHint"></p>
-    <div class="field">
-      <span class="field-label">지도 크기</span>
-      <div class="seg" role="group" aria-label="지도 크기">
-        <button type="button" data-size="5" aria-pressed="false">5×5</button>
-        <button type="button" data-size="7" aria-pressed="false">7×7</button>
-        <button type="button" data-size="10" aria-pressed="false">10×10</button>
+  <!-- ===== 지도 ===== -->
+  <section class="card stage" aria-label="지도 만들기">
+    <div class="bar">
+      <label class="field">예시
+        <select class="select" id="exampleSel" aria-label="예시 지도"></select>
+      </label>
+      <div class="bar-right">
+        <span class="field">크기
+          <select class="select sm" id="rowsSel" aria-label="세로(행) 칸 수"></select>
+          <span class="times" aria-hidden="true">×</span>
+          <select class="select sm" id="colsSel" aria-label="가로(열) 칸 수"></select>
+        </span>
+        <button type="button" class="icon-btn" id="randomBtn" title="무작위 지도" aria-label="무작위 지도">🎲</button>
+        <button type="button" class="icon-btn" id="clearBtn" title="전체 지우기" aria-label="전체 지우기">🗑️</button>
       </div>
     </div>
-    <button type="button" class="btn wide" id="clearBtn">🗑️ 전체 지우기</button>
-  </section>
-
-  <!-- ===== 2. 예시 불러오기 ===== -->
-  <section class="panel g-examples" aria-labelledby="h-ex">
-    <h2 id="h-ex"><span class="no">2</span>예시 불러오기</h2>
-    <div class="examples" id="examples"></div>
-  </section>
-  </div>
-
-  <!-- ===== 가운데 열: 탐색 실행 + 격자 지도 ===== -->
-  <div class="col">
-  <!-- ===== 3. 탐색 실행 ===== -->
-  <section class="panel g-run" aria-labelledby="h-run">
-    <div class="run-head">
-      <h2 id="h-run"><span class="no">3</span>탐색 실행</h2>
-      <label class="speed">
-        <span>자동 실행 속도</span>
-        <span aria-hidden="true">🐢</span>
-        <input type="range" id="speed" min="1" max="10" step="1" value="5" aria-label="자동 실행 속도 (오른쪽일수록 빠름)">
-        <span aria-hidden="true">🐇</span>
-        <output id="speedOut"></output>
-      </label>
+    <div class="bar">
+      <div class="seg" role="group" aria-label="그리기 도구">
+        <button type="button" data-tool="start" aria-pressed="false"><span aria-hidden="true">🧍</span>출발점</button>
+        <button type="button" data-tool="exit" aria-pressed="false"><span aria-hidden="true">🚪</span>출구</button>
+        <button type="button" data-tool="wall" aria-pressed="false"><span aria-hidden="true">🔥</span>장애물</button>
+        <button type="button" data-tool="erase" aria-pressed="false"><span aria-hidden="true">🧽</span>지우개</button>
+      </div>
+      <span class="tool-hint" id="toolHint"></span>
     </div>
-    <div class="run-grid">
-      <button type="button" class="btn primary" id="stepBtn">한 단계씩 ▶</button>
-      <button type="button" class="btn" id="autoBtn">자동 실행 ⏵</button>
-      <button type="button" class="btn" id="skipBtn">결과 바로 보기 ⏭</button>
-      <button type="button" class="btn" id="resetBtn">탐색 초기화 ↺</button>
-    </div>
-    <div class="status info" id="status" role="status" aria-live="polite"></div>
-  </section>
 
-  <!-- ===== 격자 지도 + 범례 ===== -->
-  <section class="panel g-board" aria-labelledby="h-board">
-    <div class="board-head">
-      <h2 id="h-board">🏢 건물 평면도</h2>
-      <span>좌표는 (행, 열) · 번호는 0부터 시작</span>
-    </div>
     <div class="board-wrap" id="boardWrap">
       <div class="board" id="board" role="application" aria-label="격자 지도"></div>
     </div>
+
     <ul class="legend" aria-label="범례">
-      <li><i class="sw start">🧍</i>출발점</li>
-      <li><i class="sw exit">🚪</i>출구</li>
-      <li><i class="sw wall">🔥</i>장애물(화재·붕괴)</li>
-      <li><i class="sw queue"></i>큐에서 대기 중</li>
-      <li><i class="sw current"></i>지금 꺼낸 칸</li>
-      <li><i class="sw done"></i>탐색 완료</li>
-      <li><i class="sw path"></i>최단 경로</li>
-      <li><i class="sw next"></i>다음 차례(큐 맨 앞)</li>
-      <li><i class="sw num">3</i>출발점에서의 거리</li>
+      <li><i class="sw" style="background:var(--c-start)"></i>출발점</li>
+      <li><i class="sw" style="background:var(--c-exit)"></i>출구</li>
+      <li><i class="sw" style="background:var(--c-wall)"></i>장애물</li>
+      <li><i class="sw" style="background:var(--c-queue)"></i>큐 대기</li>
+      <li><i class="sw" style="background:var(--c-cur)"></i>지금 꺼낸 칸</li>
+      <li><i class="sw" style="background:var(--c-done)"></i>확인 완료</li>
+      <li><i class="sw" style="background:var(--c-path)"></i>최단 경로</li>
+      <li>숫자 = 출발점에서의 거리</li>
     </ul>
   </section>
-  </div>
 
-  <!-- ===== 오른쪽: 결과 · 단계 설명 · 통계 · 큐 · 기록 ===== -->
-  <aside class="g-info" aria-label="탐색 정보">
-    <section class="result wide" id="result" hidden aria-live="polite"></section>
-
-    <section class="box">
-      <h3>현재 단계 설명 <span class="badge" id="stepBadge">대기</span></h3>
-      <p class="step-text" id="stepText"></p>
-      <p class="step-note" id="stepNote" hidden></p>
-      <p class="checks-title" id="checksTitle" hidden>이웃 확인 (위 → 아래 → 왼쪽 → 오른쪽)</p>
-      <ul class="checks" id="checks"></ul>
-    </section>
-
-    <section class="box">
-      <h3>통계</h3>
-      <div class="stats">
-        <div class="stat"><b id="statSteps">–</b><span>진행 단계 수</span><small>큐에서 꺼낸 횟수</small></div>
-        <div class="stat"><b id="statVisited">–</b><span>탐색한 칸 수</span><small>거리를 기록한 칸</small></div>
-        <div class="stat"><b id="statQueue">–</b><span>큐 대기 칸 수</span><small>아직 안 꺼낸 칸</small></div>
+  <!-- ===== 실행 · 결과 · 과정 ===== -->
+  <aside class="side" aria-label="실행과 결과">
+    <section class="card controls" aria-label="실행">
+      <button type="button" class="btn primary" id="runBtn">▶ 실행</button>
+      <div class="row2">
+        <button type="button" class="btn" id="skipBtn">⏭ 결과 바로 보기</button>
+        <button type="button" class="btn" id="resetBtn" title="탐색만 처음으로 (지도는 그대로)">↺ 초기화</button>
       </div>
+      <label class="speed">속도 <span aria-hidden="true">🐢</span>
+        <input type="range" id="speed" min="1" max="10" step="1" value="5" aria-label="실행 속도 (오른쪽일수록 빠름)">
+        <span aria-hidden="true">🐇</span>
+      </label>
     </section>
 
-    <section class="box">
-      <h3>큐 목록 <small>먼저 들어온 칸이 먼저 나가요</small></h3>
+    <section class="card result" id="result" hidden aria-live="polite"></section>
+
+    <section class="card narr" id="narr" aria-live="polite">
+      <div class="card-head"><span class="label">탐색 과정</span><span class="badge" id="stepBadge">대기</span></div>
+      <p class="narr-text" id="stepText"></p>
+      <p class="narr-note" id="stepNote" hidden></p>
+      <div class="divider"></div>
+      <div class="card-head" style="margin:0"><span class="label">큐</span><span class="label" style="font-weight:500">왼쪽이 다음 차례</span></div>
       <ol class="queue-list" id="queue" aria-label="큐에 있는 칸 (맨 앞부터)"></ol>
-      <p class="queue-cap">왼쪽이 <b>맨 앞</b>(다음에 꺼낼 칸)이고, 새로 발견한 칸은 오른쪽 끝(맨 뒤)에 들어가요.</p>
-    </section>
-
-    <section class="box">
-      <h3>탐색 기록 <small>단계별 기록</small></h3>
-      <ul class="log" id="log"></ul>
+      <div class="stats">
+        <span>꺼낸 칸 <b id="statSteps">–</b></span>
+        <span>발견한 칸 <b id="statVisited">–</b></span>
+        <span>큐 대기 <b id="statQueue">–</b></span>
+      </div>
+      <details class="log-wrap">
+        <summary>탐색 기록 보기</summary>
+        <ul class="log" id="log"></ul>
+      </details>
     </section>
   </aside>
 </main>
 
-<!-- ===== 설명 영역 (카드 4개) ===== -->
-<section class="explain" aria-labelledby="h-explain">
-  <h2 id="h-explain">📚 BFS 한눈에 이해하기</h2>
-  <div class="cards">
+<!-- ===== 원리 ===== -->
+<section class="wrap section" id="learn" aria-labelledby="h-learn">
+  <h2 class="section-title" id="h-learn">BFS, 그림으로 이해하기</h2>
+  <p class="section-lead">어떤 문제를 풀고, 어떻게 움직이고, 어디까지 믿을 수 있는지 세 가지만 기억하면 돼요.</p>
+  <div class="learn-grid">
 
-    <article class="card">
-      <h3><span class="ico">🌊</span>BFS란?</h3>
-      <p>BFS(Breadth-First Search, 너비 우선 탐색)는 연못에 돌을 던지면 <b>물결이 동그랗게 퍼지듯</b>, 출발점에서 가까운 칸부터 한 겹씩 넓혀 가며 살펴보는 방법이에요.</p>
-      <div class="wave" id="waveDemo" aria-hidden="true"></div>
-      <p class="wave-cap">가운데(0)에서 시작해 거리 1 → 2 → 3 → 4 순서로 퍼져요</p>
-      <p>이 순서를 지켜 주는 것이 <b>큐(queue)</b>예요. 급식 줄처럼 <b>먼저 들어온 칸이 먼저 나가요</b>(선입선출, FIFO). 새로 발견한 칸은 줄 맨 뒤에 서고, 다음에 살펴볼 칸은 줄 맨 앞에서 꺼내요.</p>
-      <div class="mini-queue" aria-label="큐 예시">
-        <span class="lbl">꺼내기 ◀</span>
-        <span class="chip front">(1, 0)</span><span class="chip">(0, 1)</span><span class="chip">(2, 0)</span>
-        <span class="lbl">◀ 넣기</span>
+    <article class="card learn">
+      <h3>🏢 어떤 문제를 푸나요?</h3>
+      <p>불이 나거나 건물 일부가 무너지면 <b>어느 출구가 가장 가까운지</b> 바로 알기 어려워요. 건물을 격자로 단순화하고, 막힌 곳을 피해 가장 가까운 출구까지의 최단 경로를 계산해요.</p>
+      <figure class="fig">
+        <div class="mini" aria-hidden="true" data-grid=". . . W . . E / S p p W . . p / . . p p p p p / W W . W . . . / E W . W . . ."></div>
+        <figcaption>가까운 왼쪽 아래 출구는 불에 막혀서, 반대편 출구로 돌아가요</figcaption>
+      </figure>
+      <div class="chips" aria-label="단순화 가정">
+        <span>직사각형 격자</span><span>상·하·좌·우 이동</span><span>모든 칸 비용 1</span>
+        <span>장애물 고정</span><span>대피자 1명</span><span>위→아래→왼쪽→오른쪽 순서</span>
       </div>
     </article>
 
-    <article class="card">
-      <h3><span class="ico">📏</span>왜 최단 경로가 보장될까?</h3>
-      <p>큐 덕분에 칸은 언제나 <b>거리 순서(0, 1, 2, …)대로</b> 꺼내져요. 그래서 출구를 처음 꺼낸 순간에는, 그보다 가까운 칸을 이미 모두 확인한 상태예요.</p>
-      <p>더 짧은 길이 있었다면 그 출구를 더 먼저 꺼냈을 테니, <b>출구를 처음 만난 순간의 거리가 곧 최단 거리</b>예요.</p>
-      <p class="callout">⚠️ 단, <b>모든 칸의 이동 비용이 같을 때만</b> 성립해요. "한 칸 = 한 걸음"이어야 "먼저 꺼낸 칸 = 더 가까운 칸"이 되기 때문이에요.</p>
-      <p class="tip">💡 출구 판정을 <b>칸을 꺼낼 때</b> 하는 것도 이 성질을 그대로 이용하기 위해서예요. 예시 ④에서 출구 <span class="nw">(0, 0)</span>은 거리 4라서, 거리 2인 <span class="nw">(2, 4)</span>보다 늦게 꺼내져요.</p>
+    <article class="card learn">
+      <h3>🌊 BFS는 이렇게 움직여요</h3>
+      <figure class="fig">
+        <div class="wave" id="waveDemo" aria-hidden="true"></div>
+        <figcaption>출발점(0)에서 물결처럼 가까운 칸부터 퍼져요</figcaption>
+      </figure>
+      <ol class="steps">
+        <li><span><b>큐</b>(먼저 들어온 칸이 먼저 나가는 줄) 맨 앞 칸을 꺼내요.</span></li>
+        <li><span>아직 안 간 이웃에 <b>거리 + 1</b>과 어디서 왔는지(부모)를 적고, 큐 뒤에 넣어요.</span></li>
+        <li><span>꺼낸 칸이 <b>출구</b>면 끝! 부모를 거꾸로 따라가면 최단 경로예요.</span></li>
+      </ol>
+      <p class="note">왜 최단일까? 가까운 칸부터 꺼내므로 <b>처음 꺼낸 출구가 가장 가까워요.</b> 단, 모든 칸의 이동 비용이 같을 때만 성립해요.</p>
     </article>
 
-    <article class="card">
-      <h3><span class="ico">📐</span>단순화 가정</h3>
-      <p>현실을 그대로 다루기는 어려우니, 아래처럼 문제를 단순하게 만들었어요.</p>
-      <ul>
-        <li>건물 평면을 정사각형 격자로 표현한다.</li>
-        <li><b>상·하·좌·우 4방향</b>으로만 이동한다. 대각선 이동은 없다.</li>
-        <li>모든 칸의 이동 비용은 <b>1로 같다</b>.</li>
-        <li>장애물(화재·붕괴 구역)은 탐색하는 동안 변하지 않는다.</li>
-        <li>대피자는 1명이고, 혼잡은 고려하지 않는다.</li>
-        <li>이웃 칸은 <b>위 → 아래 → 왼쪽 → 오른쪽</b> 순서로 확인한다.</li>
+    <article class="card learn">
+      <h3>⚠️ 한계</h3>
+      <figure class="fig">
+        <div class="mini" aria-hidden="true" data-grid="g g g g g / S m m m E / . . . . ."></div>
+        <figcaption>BFS는 칸 수만 세서 연기(💨) 속 짧은 길을 고르지만,<br>조금 멀어도 연기 없는 길(초록 점선)이 더 안전할 수 있어요</figcaption>
+      </figure>
+      <ul class="limits">
+        <li>칸마다 비용이 다르면(계단·연기) 최단을 보장 못 해요 → 다익스트라 알고리즘 필요</li>
+        <li>실제 불과 연기는 번지지만, 여기선 장애물이 고정돼 있어요</li>
+        <li>혼잡, 노약자·휠체어 이용자의 이동 조건을 반영하지 못해요</li>
       </ul>
-    </article>
-
-    <article class="card">
-      <h3><span class="ico">⚠️</span>한계</h3>
-      <p>계산이 정확해도 <b>현실과는 다를 수 있어요.</b></p>
-      <ul>
-        <li>칸마다 이동 비용이 다르면(계단, 연기 구역 등) BFS로는 최단을 보장할 수 없어요. → 비용을 고려하는 <b>다익스트라 알고리즘</b>이 필요해요.</li>
-        <li>실제 화재와 연기는 시간에 따라 번지지만, 여기서는 장애물이 고정되어 있어요.</li>
-        <li>많은 사람이 한꺼번에 몰리는 <b>혼잡</b>을 반영하지 못해요.</li>
-        <li>노약자, 휠체어 이용자 등 <b>사람마다 다른 이동 조건</b>을 반영하지 못해요.</li>
-      </ul>
-      <p class="conclusion">결론: "가장 짧은 길"이 반드시 "가장 안전한 길"은 아니다.</p>
+      <p class="conclusion">"가장 짧은 길"이 반드시 "가장 안전한 길"은 아니다.</p>
     </article>
 
   </div>
 </section>
 
-<footer>대학 과제용 교육 자료 · 외부 라이브러리 없이 HTML·CSS·JavaScript 파일 하나로 동작해요.</footer>
+<!-- ===== 검증 (접어 두기) ===== -->
+<section class="wrap section" id="verify" aria-labelledby="h-verify">
+  <details class="card verify">
+    <summary>
+      <span class="sum-title" id="h-verify">🧪 테스트와 검증</span>
+      <span class="pass" id="testSummary">검증 중…</span>
+      <span class="chev" aria-hidden="true">▾</span>
+    </summary>
+    <div class="verify-body">
+      <p>서로 다른 입력으로 BFS 핵심 함수 <code>createBFS</code>를 실제로 실행해, 손으로 계산한 예상 결과와 비교해요. 페이지를 열 때마다 자동으로 다시 확인해요.</p>
+      <div class="table-wrap">
+        <table class="tests">
+          <thead><tr><th>#</th><th>테스트 · 입력</th><th>예상 결과 · 손 계산 근거</th><th>실제 결과</th><th>일치</th><th></th></tr></thead>
+          <tbody id="testBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </details>
+</section>
+
+<footer>대학 과제용 교육 자료 · 생성형 AI(Claude)를 활용해 만들고 테스트로 동작을 검증했어요.</footer>
 
 <noscript><p style="text-align:center">이 시뮬레이터는 JavaScript가 켜져 있어야 동작해요.</p></noscript>
 
@@ -690,33 +580,37 @@ function parseAsciiMap(lines) {
       else if (ch === 'S') start = [r, c];
     });
   });
-  return { size: lines.length, start, exits, walls };
+  return { rows: lines.length, cols: lines[0].length, start, exits, walls };
 }
 
-// 예시 = 테스트 케이스 (expect는 예상 결과, 자동 검증에도 그대로 쓴다)
+// 예시 = 테스트 케이스 (expect는 예상 결과, reason은 손으로 계산한 근거. 자동 검증에도 그대로 쓴다)
 const EXAMPLES = [
   {
     name: '① 기본', summary: '5×5 · 장애물 없음',
-    size: 5, start: [0, 0], exits: [[4, 4]], walls: [],
+    rows: 5, cols: 5, start: [0, 0], exits: [[4, 4]], walls: [],
     expect: { found: true, exit: [4, 4], dist: 8 }, expectText: '최단 거리 8칸',
+    reason: '장애물이 없으면 아래로 4칸 + 오른쪽으로 4칸 = 8칸',
     message: '장애물이 없는 5×5 지도에서 (0,0)부터 (4,4)까지 가는 상황으로, 예상 결과는 최단 거리 8칸이에요.',
   },
   {
     name: '② 우회 경로', summary: '5×5 · 가운데 벽',
-    size: 5, start: [2, 0], exits: [[2, 4]], walls: [[0, 2], [1, 2], [2, 2], [3, 2]],
+    rows: 5, cols: 5, start: [2, 0], exits: [[2, 4]], walls: [[0, 2], [1, 2], [2, 2], [3, 2]],
     expect: { found: true, exit: [2, 4], dist: 8, via: [4, 2] }, expectText: '최단 거리 8칸 (아래쪽 (4,2)로 우회)',
+    reason: '벽 아래 (4,2)로 돌아감: (2,0)→(4,2) 4칸 + (4,2)→(2,4) 4칸 = 8칸',
     message: '(0,2)~(3,2)의 세로 벽 때문에 (2,0)에서 (2,4)로 가려면 아래쪽 (4,2)로 돌아가야 해서, 예상 결과는 최단 거리 8칸이에요.',
   },
   {
     name: '③ 출구가 막힘', summary: '5×5 · 출구 주변 막힘',
-    size: 5, start: [0, 0], exits: [[4, 4]], walls: [[3, 4], [4, 3]],
-    expect: { found: false, reachable: 22 }, expectText: '경로 없음',
+    rows: 5, cols: 5, start: [0, 0], exits: [[4, 4]], walls: [[3, 4], [4, 3]],
+    expect: { found: false, reachable: 22 }, expectText: '경로 없음 (도달 가능 22칸)',
+    reason: '출구로 들어가는 이웃 (3,4)·(4,3)이 모두 막힘 → 25칸 − 장애물 2 − 출구 1 = 22칸만 도달',
     message: '출구 (4,4)의 위 (3,4)와 왼쪽 (4,3)이 모두 막혀 있어서, 예상 결과는 경로 없음이에요.',
   },
   {
     name: '④ 출구 여러 개', summary: '5×5 · 출구 2곳',
-    size: 5, start: [2, 2], exits: [[0, 0], [2, 4]], walls: [],
+    rows: 5, cols: 5, start: [2, 2], exits: [[0, 0], [2, 4]], walls: [],
     expect: { found: true, exit: [2, 4], dist: 2 }, expectText: '(2,4)까지 2칸',
+    reason: '(2,4)는 오른쪽 2칸, (0,0)은 위 2칸 + 왼쪽 2칸 = 4칸 → 더 가까운 (2,4)',
     message: '(2,2)에서 출구 (0,0)과 (2,4) 중 더 가까운 곳을 찾는 상황으로, 예상 결과는 (2,4)까지 2칸이에요.',
   },
   {
@@ -734,9 +628,30 @@ const EXAMPLES = [
       '...#...#.E',                                   // 9행: 오른쪽 아래 구석 (9,9)는 출구
     ]),
     expect: { found: true, exit: [4, 0], dist: 11 }, expectText: '경로 존재 · (4,0)까지 11칸',
+    reason: '복도 화재로 복도가 끊김 → 위쪽 방 문 (1,7)·(2,3)을 지나 (4,0)까지 11칸 ((9,9)까지는 13칸)',
     message: '(1,8) 방에 있는 대피자가 복도 화재 (4,3)·(4,4)를 피해 출구 (4,0)·(9,9) 중 가까운 곳으로 가는 상황으로, 예상 결과는 위쪽 방들을 지나 (4,0)까지 11칸이에요.',
   },
+  {
+    name: '⑥ 지그재그 복도', summary: '3×10 · 직사각형',
+    ...parseAsciiMap([
+      '...#......',                                   // 0행: (0,6)이 유일한 통로
+      'S..#..#...',                                   // 1행: 대피자는 왼쪽 끝 (1,0)
+      '......#..E',                                   // 2행: (2,3)이 유일한 통로, 출구는 오른쪽 끝 (2,9)
+    ]),
+    expect: { found: true, exit: [2, 9], dist: 14 }, expectText: '(2,9)까지 14칸',
+    reason: '통로 (2,3)·(0,6)을 차례로 지나야 함: 4칸 + 5칸 + 5칸 = 14칸',
+    message: '3×10 직사각형 복도에서 장애물이 아래·위로 번갈아 막고 있어 지그재그로 돌아가야 해서, 예상 결과는 (2,9)까지 14칸이에요.',
+  },
 ];
+
+// 예외 상황: 출발점의 네 방향이 모두 막힌 경우 (예시 목록에는 없고 검증 표에서 불러올 수 있음)
+const ENCLOSED = {
+  name: '출발점이 갇힘', summary: '3×3',
+  rows: 3, cols: 3, start: [1, 1], exits: [[0, 0]], walls: [[0, 1], [1, 0], [1, 2], [2, 1]],
+  expect: { found: false, reachable: 1 }, expectText: '경로 없음 (도달 가능 1칸)',
+  reason: '네 방향이 모두 장애물 → 큐에 출발점 1칸만 들어갔다가 바로 빔',
+  message: '출발점 (1,1)의 위·아래·왼쪽·오른쪽이 모두 막혀 있어서, 예상 결과는 경로 없음(도달 가능 1칸)이에요.',
+};
 // ===== 예시 데이터 끝 =====
 
 
@@ -748,6 +663,8 @@ const $ = (selector) => document.querySelector(selector);              // 요소
 const fmt = ([r, c]) => `(${r}, ${c})`;                                // 좌표 → "(행, 열)"
 const fmtShort = ([r, c]) => `(${r},${c})`;                            // 경로 목록용 짧은 표기
 const sameCell = (a, b) => !!a && !!b && a[0] === b[0] && a[1] === b[1]; // 두 좌표가 같은 칸인지
+const MIN_SIZE = 1;                                                     // 지도 한 변의 최소 칸 수
+const MAX_SIZE = 10;                                                    // 지도 한 변의 최대 칸 수
 
 // 숫자를 한국어로 읽었을 때 마지막 글자에 받침이 있는지 (을/를, 으로/로 고르기용)
 function hasBatchim(n) {
@@ -762,16 +679,18 @@ const SPEED_MS = [1500, 1100, 800, 600, 450, 320, 220, 140, 80, 40];   // 속도
 const ICON = { empty: '', start: '🧍', exit: '🚪', wall: '🔥' };
 const TYPE_NAME = { empty: '빈 칸', start: '출발점', exit: '출구', wall: '장애물' };
 const TOOL_HINT = {
-  start: '🧍 칸을 누르면 출발점을 놓아요. 출발점은 하나뿐이라 다른 칸을 누르면 그쪽으로 옮겨가요.',
-  exit: '🚪 칸을 누르면 출구를 추가해요. 출구는 여러 개 둘 수 있고, 출구를 다시 누르면 지워져요.',
-  wall: '🔥 누른 채로 드래그하면 여러 칸에 장애물을 칠할 수 있어요. (출발점·출구 칸은 그대로 둬요)',
-  erase: '🧽 누른 채로 드래그하면 여러 칸을 빈 칸으로 지울 수 있어요.',
+  start: '칸을 눌러 출발점을 놓아요 (1개)',
+  exit: '칸을 눌러 출구를 추가하거나 지워요',
+  wall: '드래그해서 여러 칸을 막아요',
+  erase: '드래그해서 여러 칸을 지워요',
 };
-const IDLE_TEXT = '아직 탐색 전이에요. 「한 단계씩 ▶」 버튼을 처음 누르면 출발점을 큐에 넣고, 그 뒤로는 누를 때마다 큐에서 칸을 하나씩 꺼내 이웃을 확인해요.';
+const IDLE_TEXT = '「▶ 실행」을 누르면 출발점에서 가까운 칸부터 차례로 탐색하는 과정을 보여 줘요.';
+const REDUCED_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // 화면 상태 (지도 + 진행 중인 탐색)
 const app = {
-  size: 5,          // 지도 한 변의 칸 수
+  rows: 5,          // 지도 세로(행) 칸 수
+  cols: 5,          // 지도 가로(열) 칸 수
   map: [],          // map[행][열] = 'empty' | 'wall' | 'start' | 'exit'
   tool: 'wall',     // 지금 고른 도구
   bfs: null,        // 진행 중인 BFS (탐색 전이면 null)
@@ -780,47 +699,64 @@ const app = {
   path: null,       // 찾은 최단 경로
   outcome: null,    // 'found' | 'noPath' | null(진행 중)
   timer: null,      // 자동 실행 타이머
+  walkTimer: null,  // 대피자 달리기 효과 타이머
   example: null,    // 불러온 예시 (지도를 고치면 null)
   painting: false,  // 드래그로 칠하는 중인지
 };
 
 const ui = {
-  board: $('#board'), boardWrap: $('#boardWrap'), status: $('#status'),
-  stepBadge: $('#stepBadge'), stepText: $('#stepText'), stepNote: $('#stepNote'),
-  checksTitle: $('#checksTitle'), checks: $('#checks'),
+  board: $('#board'), boardWrap: $('#boardWrap'),
+  narr: $('#narr'), stepBadge: $('#stepBadge'), stepText: $('#stepText'), stepNote: $('#stepNote'),
   statSteps: $('#statSteps'), statVisited: $('#statVisited'), statQueue: $('#statQueue'),
   queue: $('#queue'), log: $('#log'), result: $('#result'),
-  stepBtn: $('#stepBtn'), autoBtn: $('#autoBtn'), skipBtn: $('#skipBtn'), resetBtn: $('#resetBtn'),
-  speed: $('#speed'), speedOut: $('#speedOut'), clearBtn: $('#clearBtn'),
-  examples: $('#examples'), toolHint: $('#toolHint'),
+  runBtn: $('#runBtn'), skipBtn: $('#skipBtn'), resetBtn: $('#resetBtn'), speed: $('#speed'),
+  clearBtn: $('#clearBtn'), randomBtn: $('#randomBtn'), toolHint: $('#toolHint'),
+  exampleSel: $('#exampleSel'), rowsSel: $('#rowsSel'), colsSel: $('#colsSel'),
+  testBody: $('#testBody'), testSummary: $('#testSummary'),
 };
 let cellEls = [];   // cellEls[행][열] = { el, icon, num }
 
+// ---------- 안내 문구 (탐색 과정 카드 하나로 모든 안내를 보여 준다) ----------
+function setNarration({ badge = '대기', tone = '', html, note = '' }) {
+  ui.stepBadge.textContent = badge;
+  ui.stepBadge.className = `badge ${tone}`;
+  ui.stepText.innerHTML = html;
+  ui.stepNote.innerHTML = note;
+  ui.stepNote.hidden = !note;
+  ui.narr.classList.remove('shake');
+  if (tone === 'warn') {
+    void ui.narr.offsetWidth;                              // 흔들기 효과를 다시 시작하려고 한 번 다시 계산
+    ui.narr.classList.add('shake');
+  }
+}
+const idle = (html) => setNarration({ badge: '대기', html });
+const warn = (html) => setNarration({ badge: '확인 필요', tone: 'warn', html });
+
 // ---------- 지도 만들기 ----------
-function makeMap(n) {
-  return Array.from({ length: n }, () => Array(n).fill('empty'));
+function makeMap(rows, cols) {
+  return Array.from({ length: rows }, () => Array(cols).fill('empty'));
 }
 
 // 격자(행·열 번호 + 칸)를 새로 그린다
 function buildBoard() {
-  const n = app.size;
-  ui.boardWrap.dataset.n = n;
-  ui.boardWrap.style.setProperty('--n', n);
-  ui.board.setAttribute('aria-label', `${n}×${n} 격자 지도`);
+  const { rows, cols } = app;
+  ui.boardWrap.style.setProperty('--rows', rows);
+  ui.boardWrap.style.setProperty('--cols', cols);
+  ui.board.setAttribute('aria-label', `세로 ${rows} × 가로 ${cols} 격자 지도`);
   ui.board.textContent = '';
-  const addHdr = (text, cls) => {
+  const addHdr = (text) => {
     const h = document.createElement('div');
-    h.className = `hdr ${cls}`;
+    h.className = 'hdr';
     h.textContent = text;
     ui.board.appendChild(h);
   };
-  addHdr('', 'corner');
-  for (let c = 0; c < n; c++) addHdr(c, 'col');          // 위쪽: 열 번호
+  addHdr('');
+  for (let c = 0; c < cols; c++) addHdr(c);              // 위쪽: 열 번호
   cellEls = [];
-  for (let r = 0; r < n; r++) {
-    addHdr(r, 'row');                                    // 왼쪽: 행 번호
+  for (let r = 0; r < rows; r++) {
+    addHdr(r);                                           // 왼쪽: 행 번호
     const row = [];
-    for (let c = 0; c < n; c++) {
+    for (let c = 0; c < cols; c++) {
       const el = document.createElement('div');
       el.className = 'cell t-empty';
       el.dataset.r = r;
@@ -873,77 +809,110 @@ function applyTool(r, c) {
 
 // 지도가 바뀌면: 진행 중인 탐색은 자동으로 초기화
 function mapChanged() {
+  const wasExample = !!app.example;
   app.example = null;
   markExample(null);
   if (app.bfs) {
     resetSearch();
-    setStatus('info', '✏️ 지도가 바뀌어서 탐색을 처음부터 다시 준비했어요. 다시 실행해 보세요.');
+    idle('✏️ 지도가 바뀌어서 탐색을 처음부터 다시 준비했어요. 「▶ 실행」을 눌러 다시 탐색해 보세요.');
+  } else if (wasExample) {
+    idle('✏️ 지도를 직접 고치는 중이에요. 다 만들었으면 「▶ 실행」을 눌러 보세요.');
   }
   render();
 }
 
 function setTool(tool) {
   app.tool = tool;
-  document.querySelectorAll('.tool').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tool === tool)));
+  document.querySelectorAll('[data-tool]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tool === tool)));
   ui.toolHint.textContent = TOOL_HINT[tool];
 }
 
+// 크기 선택 상자에 1~10을 채운다
+function buildSizeSelects() {
+  [ui.rowsSel, ui.colsSel].forEach((sel) => {
+    for (let n = MIN_SIZE; n <= MAX_SIZE; n++) sel.add(new Option(String(n), String(n)));
+  });
+}
 function markSize() {
-  document.querySelectorAll('.seg button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.size === app.size)));
+  ui.rowsSel.value = app.rows;
+  ui.colsSel.value = app.cols;
 }
 
-function setSize(n) {
-  if (n === app.size) return;
+// 지도 크기 바꾸기 (새 범위 안의 칸은 그대로 옮긴다)
+function setSize(rows, cols) {
+  rows = Math.min(MAX_SIZE, Math.max(MIN_SIZE, rows));
+  cols = Math.min(MAX_SIZE, Math.max(MIN_SIZE, cols));
+  if (rows === app.rows && cols === app.cols) { markSize(); return; }
   const old = app.map;
-  app.size = n;
-  app.map = makeMap(n);
-  for (let r = 0; r < Math.min(n, old.length); r++) {      // 새 크기 안에 들어가는 칸은 그대로 옮긴다
-    for (let c = 0; c < Math.min(n, old.length); c++) app.map[r][c] = old[r][c];
+  app.rows = rows;
+  app.cols = cols;
+  app.map = makeMap(rows, cols);
+  for (let r = 0; r < Math.min(rows, old.length); r++) {
+    for (let c = 0; c < Math.min(cols, old[0].length); c++) app.map[r][c] = old[r][c];
   }
   app.example = null;
   markExample(null);
   resetSearch();
   buildBoard();
   markSize();
-  setStatus('info', `📏 지도 크기를 ${n}×${n}${josaRo(n)} 바꿨어요. 범위를 벗어난 칸은 사라져요.`);
+  idle(`📏 세로 ${rows} × 가로 ${cols} 지도로 바꿨어요. 범위를 벗어난 칸은 사라져요.`);
   render();
 }
 
 function clearAll() {
-  app.map = makeMap(app.size);
+  app.map = makeMap(app.rows, app.cols);
   app.example = null;
   markExample(null);
   resetSearch();
-  setStatus('info', '🗑️ 지도를 모두 지웠어요. 도구를 골라 출발점·출구·장애물을 새로 놓아 보세요.');
+  idle('🗑️ 지도를 비웠어요. 위의 도구로 출발점·출구·장애물을 놓아 보세요.');
+  render();
+}
+
+// 지금 크기로 무작위 지도 만들기 (장애물 약 28%, 출구 1~2개). 경로가 없을 수도 있어요.
+function randomMap() {
+  const total = app.rows * app.cols;
+  if (total < 2) {
+    warn('🎲 출발점과 출구를 따로 놓으려면 칸이 2개 이상 필요해요. 지도 크기를 늘려 주세요.');
+    return;
+  }
+  const cells = [];
+  for (let r = 0; r < app.rows; r++) for (let c = 0; c < app.cols; c++) cells.push([r, c]);
+  for (let i = cells.length - 1; i > 0; i--) {             // 칸 순서를 무작위로 섞는다
+    const j = Math.floor(Math.random() * (i + 1));
+    [cells[i], cells[j]] = [cells[j], cells[i]];
+  }
+  const exitCount = total >= 6 && Math.random() < 0.5 ? 2 : 1;
+  app.map = makeMap(app.rows, app.cols);
+  const [sr, sc] = cells[0];
+  app.map[sr][sc] = 'start';
+  cells.slice(1, 1 + exitCount).forEach(([r, c]) => { app.map[r][c] = 'exit'; });
+  cells.slice(1 + exitCount).forEach(([r, c]) => { if (Math.random() < 0.28) app.map[r][c] = 'wall'; });
+  app.example = null;
+  markExample(null);
+  resetSearch();
+  idle('🎲 무작위 지도예요. 출구까지 길이 있을지 먼저 예상해 보고 「▶ 실행」으로 확인해 보세요.');
   render();
 }
 
 // ---------- 예시 ----------
-function buildExampleButtons() {
-  EXAMPLES.forEach((ex, i) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'ex';
-    b.dataset.index = i;
-    const name = document.createElement('b');
-    name.textContent = ex.name;
-    const sum = document.createElement('span');
-    sum.textContent = ex.summary;
-    b.append(name, sum);
-    b.addEventListener('click', () => loadExample(ex));
-    ui.examples.appendChild(b);
+function buildExampleSelect() {
+  const custom = new Option('✏️ 직접 만든 지도', '');
+  custom.disabled = true;
+  ui.exampleSel.add(custom);
+  EXAMPLES.forEach((ex, i) => ui.exampleSel.add(new Option(`${ex.name} · ${ex.summary}`, String(i))));
+  ui.exampleSel.addEventListener('change', () => {
+    if (ui.exampleSel.value !== '') loadExample(EXAMPLES[+ui.exampleSel.value]);
   });
 }
-
 function markExample(ex) {
   const idx = ex ? EXAMPLES.indexOf(ex) : -1;
-  ui.examples.querySelectorAll('.ex').forEach((b) => b.classList.toggle('active', +b.dataset.index === idx));
+  ui.exampleSel.value = idx >= 0 ? String(idx) : '';
 }
-
 function loadExample(ex) {
   stopAuto();
-  app.size = ex.size;
-  app.map = makeMap(ex.size);
+  app.rows = ex.rows;
+  app.cols = ex.cols;
+  app.map = makeMap(ex.rows, ex.cols);
   ex.walls.forEach(([r, c]) => { app.map[r][c] = 'wall'; });
   ex.exits.forEach(([r, c]) => { app.map[r][c] = 'exit'; });
   app.map[ex.start[0]][ex.start[1]] = 'start';
@@ -952,7 +921,7 @@ function loadExample(ex) {
   buildBoard();
   markSize();
   markExample(ex);
-  setStatus('info', `📂 ${ex.name}: ${ex.message}`);
+  idle(`<b>${ex.name}</b> ${ex.message}<span class="sub">「▶ 실행」을 눌러 확인해 보세요.</span>`);
   render();
 }
 
@@ -960,24 +929,20 @@ function loadExample(ex) {
 // 탐색을 새로 시작한다 (출발점을 큐에 넣는 0단계). 시작하지 못하면 false
 function beginSearch() {
   const { start, exits, walls } = collectMap();
-  if (!start || !exits.length) {
-    const missing = !start && !exits.length ? '🧍 출발점과 🚪 출구가' : !start ? '🧍 출발점이' : '🚪 출구가';
-    setStatus('warn', `${missing} 없어서 탐색을 시작할 수 없어요. 「1. 지도 만들기」의 도구로 먼저 놓아 주세요.`);
-    return false;
-  }
-  app.bfs = createBFS(app.size, app.size, walls, start, exits);
+  if (!start && !exits.length) { warn('🧍 출발점과 🚪 출구가 없어요. 지도 위쪽의 도구로 먼저 놓아 주세요.'); return false; }
+  if (!start) { warn('🧍 출발점이 없어요. 도구에서 「출발점」을 고른 뒤 칸을 눌러 주세요.'); return false; }
+  if (!exits.length) { warn('🚪 출구가 없어요. 도구에서 「출구」를 고른 뒤 칸을 눌러 주세요.'); return false; }
+  app.bfs = createBFS(app.rows, app.cols, walls, start, exits);
   app.current = null;
   app.lastAdded = [start];
   app.path = null;
   app.outcome = null;
   clearLog();
   addLog(`0. 출발점 ${fmt(start)} 큐에 넣음 (거리 0)`);
-  setStep({
-    badge: '0단계', kind: 'run',
-    html: `출발점 <b>${fmt(start)}</b>${josaEulReul(start[1])} 거리 0으로 방문 표시(dist)하고 큐에 넣었어요. 이제 누를 때마다 큐 맨 앞 칸을 하나씩 꺼내서 이웃을 확인해요.`,
+  setNarration({
+    badge: '0단계', tone: 'run',
+    html: `출발점 <b>${fmt(start)}</b>${josaEulReul(start[1])} 거리 0으로 기록하고 큐에 넣었어요. 이제 큐 맨 앞 칸을 하나씩 꺼내며 이웃을 살펴봐요.`,
   });
-  if (app.example) setStatus('info', `📂 ${app.example.name}: ${app.example.message}`); // 예시라면 예상 결과를 계속 보여 줌
-  else setStatus('info', '🔎 탐색을 시작했어요. 노란 칸은 큐에서 차례를 기다리는 칸이에요.');
   return true;
 }
 
@@ -989,97 +954,92 @@ function advance() {
   return true;
 }
 
-// BFS가 돌려준 결과를 화면 설명·기록·결과로 옮긴다
+// BFS가 돌려준 결과를 설명·기록·결과로 옮긴다
 function applyResult(res) {
   if (res.type === 'expand') {
     app.current = res.cell;
     app.lastAdded = res.added;
-    const addedText = res.added.length ? `${res.added.map(fmt).join(', ')} 추가` : '추가 없음';
-    addLog(`${res.steps}. ${fmt(res.cell)} 꺼냄 → ${addedText}`);
-    let html = `<b>${fmt(res.cell)}</b> 칸을 큐에서 꺼냈어요 (거리 ${res.dist}). `;
+    addLog(`${res.steps}. ${fmt(res.cell)} 꺼냄 → ${res.added.length ? `${res.added.map(fmt).join(', ')} 추가` : '추가 없음'}`);
+    let html = `<b>${fmt(res.cell)}</b> 칸을 꺼냈어요 (거리 ${res.dist}). `;
     if (res.added.length) {
       const last = res.added[res.added.length - 1];
-      html += `새로 발견한 이웃 ${res.added.map((c) => `<b>${fmt(c)}</b>`).join(', ')}${josaEulReul(last[1])} 거리 ${res.dist + 1}${josaRo(res.dist + 1)} 기록하고 큐 뒤에 넣었어요.`;
+      html += `새 이웃 ${res.added.map((c) => `<b>${fmt(c)}</b>`).join(', ')}${josaEulReul(last[1])} 거리 ${res.dist + 1}${josaRo(res.dist + 1)} 기록하고 큐 뒤에 넣었어요.`;
     } else {
       html += '새로 갈 수 있는 이웃이 없어요. (지도 밖, 장애물, 이미 발견한 칸은 건너뜀)';
     }
     const foundExits = res.added.filter(([r, c]) => app.map[r][c] === 'exit');
     const note = foundExits.length
-      ? `🚪 출구 ${foundExits.map(fmt).join(', ')}${josaEulReul(foundExits[foundExits.length - 1][1])} 발견했어요! 하지만 출구 판정은 큐에서 <b>꺼낼 때</b> 하므로, 앞에 줄 선 칸들을 먼저 처리해요.`
+      ? `🚪 출구 ${foundExits.map(fmt).join(', ')}${josaEulReul(foundExits[foundExits.length - 1][1])} 발견했어요. 출구 판정은 큐에서 <b>꺼낼 때</b> 하므로, 앞에 줄 선 칸부터 처리해요.`
       : '';
-    setStep({ badge: `${res.steps}단계`, kind: 'run', html, note, checks: res.checks });
+    setNarration({ badge: `${res.steps}단계`, tone: 'run', html, note });
   } else if (res.type === 'found') {
     app.current = res.cell;
     app.lastAdded = [];
     app.path = res.path;
     app.outcome = 'found';
     addLog(`${res.steps}. ${fmt(res.cell)} 꺼냄 → 🚪 출구 도착! (거리 ${res.dist})`, 'found');
-    setStep({
-      badge: `${res.steps}단계 · 도착`, kind: 'ok',
-      html: `<b>${fmt(res.cell)}</b> 칸을 큐에서 꺼냈어요 (거리 ${res.dist}). 이 칸은 🚪 출구예요!`,
-      note: `칸을 거리 순서대로 꺼내기 때문에, <b>처음 꺼낸 출구까지의 거리 ${res.dist}칸이 최단 거리</b>예요. 출구에서 부모 칸(parent)을 거꾸로 따라가 최단 경로를 보라색으로 표시했어요.`,
+    setNarration({
+      badge: '도착', tone: 'ok',
+      html: `<b>${fmt(res.cell)}</b> 칸을 꺼냈어요. 🚪 출구예요!`,
+      note: `가까운 칸부터 꺼내므로 <b>처음 꺼낸 출구까지의 ${res.dist}칸이 최단 거리</b>예요. 출구에서 부모 칸을 거꾸로 따라가 보라색 경로를 그렸어요.`,
     });
     showResult(res);
-    setStatus('ok', `✅ 출구 ${fmt(res.cell)}까지 최단 거리 ${res.dist}칸인 대피 경로를 찾았어요. 보라색 칸을 따라가면 돼요.`);
   } else if (res.type === 'noPath') {
     app.current = null;
     app.lastAdded = [];
     app.outcome = 'noPath';
     addLog('■ 큐가 비어서 탐색 종료 → 경로 없음', 'nopath');
-    setStep({
-      badge: '종료', kind: 'bad',
-      html: '큐가 비었어요. 더 꺼낼 칸이 없으니 탐색을 끝냈어요.',
-      note: `출발점에서 갈 수 있는 칸 ${res.reachable}개를 모두 확인했지만, 그중에 출구가 없었어요.`,
+    setNarration({
+      badge: '경로 없음', tone: 'bad',
+      html: `큐가 비었어요. 갈 수 있는 칸 ${res.reachable}개를 모두 확인했지만 출구에 닿지 못했어요.`,
     });
     showResult(res);
-    setStatus('bad', `❌ 출구까지 갈 수 있는 경로가 없습니다. 출발점에서 도달할 수 있는 칸은 ${res.reachable}칸이에요.`);
   }
 }
 
-// 예시를 그대로 실행했다면 예상 결과와 비교한 문장을 만든다
-function compareWithExample(res) {
-  const ex = app.example;
-  if (!ex) return null;
-  const e = ex.expect;
-  const ok = res.type === 'found'
-    ? e.found && sameCell(e.exit, res.cell) && e.dist === res.dist
-    : !e.found;
-  return { ok, text: ok ? `👍 예시의 예상 결과(${ex.expectText})와 일치해요.` : `예시의 예상 결과(${ex.expectText})와 달라요.` };
+// 결과가 예상(expect)과 같은지 판단한다 (예시 결과 비교와 검증 표에서 함께 사용)
+function matchesExpect(expect, res) {
+  if (res.type === 'found') {
+    return expect.found && sameCell(expect.exit, res.cell) && expect.dist === res.dist
+      && (!expect.via || res.path.some((p) => sameCell(p, expect.via)));
+  }
+  return !expect.found && (expect.reachable === undefined || expect.reachable === res.reachable);
 }
 
 function showResult(res) {
-  const box = ui.result;
-  const cmp = compareWithExample(res);
-  const cmpHtml = cmp ? `<p class="match${cmp.ok ? '' : ' diff'}">${cmp.text}</p>` : '';
-  if (res.type === 'found') {
-    box.className = 'result ok wide';
-    box.innerHTML = `
-      <h3>✅ 대피 경로를 찾았어요</h3>
-      <dl class="facts">
-        <div><dt>도착한 출구</dt><dd>${fmt(res.cell)}</dd></div>
-        <div><dt>최단 이동 거리</dt><dd>${res.dist}칸</dd></div>
-        <div><dt>탐색한 칸 수</dt><dd>${app.bfs.getVisitedCount()}칸</dd></div>
-      </dl>
-      <p class="sub">탐색한 칸 = 거리를 기록한(방문 표시한) 칸 · 그중 ${res.steps}칸을 큐에서 꺼내 확인했어요.</p>
-      <p class="path-title">경로 좌표 <small>(출발점 포함 ${res.path.length}칸, 이동 ${res.dist}번)</small></p>
-      <p class="path-list">${res.path.map(fmtShort).join(' → ')}</p>
-      ${cmpHtml}`;
-  } else {
-    box.className = 'result bad wide';
-    box.innerHTML = `
-      <h3>❌ 출구까지 갈 수 있는 경로가 없습니다</h3>
-      <dl class="facts one">
-        <div><dt>출발점에서 도달할 수 있는 칸 수</dt><dd>${res.reachable}칸 <small>(출발점 포함)</small></dd></div>
-      </dl>
-      <p class="sub">민트색 칸이 출발점에서 갈 수 있는 범위예요. 출구 주변이 장애물로 막혀 있지 않은지 확인해 보세요.</p>
-      ${cmpHtml}`;
+  const ex = app.example;
+  let cmp = '';
+  if (ex) {
+    const ok = matchesExpect(ex.expect, res);
+    cmp = `<p class="match${ok ? '' : ' diff'}">${ok ? '✓ 예상 결과와 일치' : '⚠️ 예상 결과와 다름'} (${ex.expectText})</p>`;
   }
-  box.hidden = false;
+  if (res.type === 'found') {
+    ui.result.className = 'card result ok';
+    ui.result.innerHTML = `
+      <h3>✅ 대피 경로를 찾았어요</h3>
+      <div class="kpis">
+        <div class="kpi main"><span>최단 거리</span><b>${res.dist}칸</b></div>
+        <div class="kpi"><span>도착 출구</span><b>${fmt(res.cell)}</b></div>
+        <div class="kpi"><span>탐색한 칸</span><b>${app.bfs.getVisitedCount()}칸</b></div>
+      </div>
+      <p class="path-list">${res.path.map(fmtShort).join(' → ')}</p>
+      ${cmp}
+      <p class="reality">칸 수로 센 가장 짧은 길이에요. 실제 대피에서는 연기·혼잡·이동이 어려운 사람도 함께 따져야 해요.</p>`;
+  } else {
+    ui.result.className = 'card result bad';
+    ui.result.innerHTML = `
+      <h3>❌ 출구까지 갈 수 있는 경로가 없습니다</h3>
+      <div class="kpis one"><div class="kpi main"><span>출발점에서 도달할 수 있는 칸</span><b>${res.reachable}칸</b></div></div>
+      ${cmp}
+      <p class="reality">민트색 칸이 갈 수 있는 범위예요. 실제 상황이라면 구조 요청처럼 경로 밖의 대책이 필요해요.</p>`;
+  }
+  ui.result.hidden = false;
 }
 
 // 탐색만 지운다 (지도는 그대로)
 function resetSearch() {
   stopAuto();
+  stopWalker();
   app.bfs = null;
   app.current = null;
   app.lastAdded = [];
@@ -1088,16 +1048,10 @@ function resetSearch() {
   ui.result.hidden = true;
   ui.result.innerHTML = '';
   clearLog();
-  setStep({ badge: '대기', kind: '', html: IDLE_TEXT });
 }
 
-// ---------- 자동 실행 ----------
-function currentDelay() {
-  return SPEED_MS[+ui.speed.value - 1];
-}
-function updateSpeedLabel() {
-  ui.speedOut.textContent = `${+(currentDelay() / 1000).toFixed(2)}초마다 1단계`;
-}
+// ---------- 실행 / 일시정지 / 결과 바로 보기 ----------
+const currentDelay = () => SPEED_MS[+ui.speed.value - 1];
 function stopAuto() {
   if (app.timer) clearTimeout(app.timer);
   app.timer = null;
@@ -1107,64 +1061,50 @@ function autoTick() {
   const moved = advance();
   if (moved && app.bfs && !app.bfs.isFinished()) app.timer = setTimeout(autoTick, currentDelay());
   render();
+  if (app.outcome === 'found') startWalker(app.path);
 }
-function toggleAuto() {
+// 「실행」 버튼: 실행 ↔ 일시정지, 끝난 뒤에는 처음부터 다시 실행
+function onRunClick() {
   if (app.timer) { stopAuto(); render(); return; }
+  if (app.bfs && app.bfs.isFinished()) resetSearch();      // 다시 실행
   autoTick();
 }
 function skipToEnd() {
   stopAuto();
   if (!app.bfs && !beginSearch()) { render(); return; }
-  let guard = app.size * app.size + 5;                     // 혹시 모를 무한 반복을 막는 안전장치
+  let guard = app.rows * app.cols + 5;                     // 혹시 모를 무한 반복을 막는 안전장치
   while (!app.bfs.isFinished() && guard-- > 0) advance();
   render();
+  if (app.outcome === 'found') startWalker(app.path);
+}
+
+// ---------- 경로를 찾은 뒤 대피자가 달려가는 효과 ----------
+function stopWalker() {
+  if (app.walkTimer) clearTimeout(app.walkTimer);
+  app.walkTimer = null;
+  ui.board.querySelectorAll('.walker, .arrived').forEach((el) => el.classList.remove('walker', 'arrived'));
+}
+function startWalker(path) {
+  stopWalker();
+  if (REDUCED_MOTION || !path || path.length < 2) return;
+  let i = 0;
+  const stepWalk = () => {
+    ui.board.querySelectorAll('.walker').forEach((el) => el.classList.remove('walker'));
+    if (i === path.length) {                                 // 출구 도착
+      const [r, c] = path[path.length - 1];
+      cellEls[r][c].el.classList.add('arrived');
+      app.walkTimer = null;
+      return;
+    }
+    const [r, c] = path[i];
+    cellEls[r][c].el.classList.add('walker');
+    i++;
+    app.walkTimer = setTimeout(stepWalk, 190);
+  };
+  app.walkTimer = setTimeout(stepWalk, path.length * 60 + 450); // 보라색 경로가 다 그려진 뒤 출발
 }
 
 // ---------- 화면 그리기 ----------
-function setStatus(kind, text) {
-  ui.status.className = `status ${kind}`;
-  ui.status.textContent = text;
-  if (kind === 'warn') {
-    void ui.status.offsetWidth;                            // 흔들기 효과를 다시 시작하려고 한 번 다시 계산
-    ui.status.classList.add('shake');
-  }
-}
-
-function setStep({ badge, kind = '', html, note = '', checks = [] }) {
-  ui.stepBadge.textContent = badge;
-  ui.stepBadge.className = `badge ${kind}`;
-  ui.stepText.innerHTML = html;
-  ui.stepNote.innerHTML = note;
-  ui.stepNote.hidden = !note;
-  ui.checksTitle.hidden = !checks.length;
-  ui.checks.textContent = '';
-  checks.forEach((ch) => {
-    const li = document.createElement('li');
-    li.className = ch.result;
-    let text;
-    if (ch.result === 'add') {
-      const isExit = app.map[ch.cell[0]][ch.cell[1]] === 'exit';
-      text = `✅ 새로 발견 → 거리 ${app.bfs.getDist(ch.cell[0], ch.cell[1])}, 큐에 추가${isExit ? ' (🚪 출구)' : ''}`;
-    } else if (ch.result === 'wall') {
-      text = '🔥 장애물 → 건너뜀';
-    } else if (ch.result === 'seen') {
-      text = `↩️ 이미 발견(거리 ${app.bfs.getDist(ch.cell[0], ch.cell[1])}) → 건너뜀`;
-    } else {
-      text = '🚫 지도 밖 → 건너뜀';
-    }
-    const dir = document.createElement('span');
-    dir.className = 'dir';
-    dir.textContent = ch.dir;
-    const co = document.createElement('span');
-    co.className = 'co';
-    co.textContent = fmt(ch.cell);
-    const res = document.createElement('span');
-    res.textContent = text;
-    li.append(dir, co, res);
-    ui.checks.appendChild(li);
-  });
-}
-
 function clearLog() {
   ui.log.innerHTML = '<li class="empty">아직 기록이 없어요.</li>';
 }
@@ -1181,15 +1121,13 @@ function addLog(text, kind = '') {
 }
 
 function renderCells() {
-  const n = app.size;
+  const { rows, cols } = app;
   const bfs = app.bfs;
-  const queue = bfs ? bfs.getQueue() : [];
-  const inQueue = new Set(queue.map(([r, c]) => r * n + c));
-  const next = !app.outcome && queue.length ? queue[0] : null;
-  const pathIdx = new Map((app.path || []).map(([r, c], i) => [r * n + c, i]));
-  for (let r = 0; r < n; r++) {
-    for (let c = 0; c < n; c++) {
-      const k = r * n + c;
+  const inQueue = new Set((bfs ? bfs.getQueue() : []).map(([r, c]) => r * cols + c));
+  const pathIdx = new Map((app.path || []).map(([r, c], i) => [r * cols + c, i]));
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const k = r * cols + c;
       const type = app.map[r][c];
       const d = bfs ? bfs.getDist(r, c) : -1;
       let state = '';
@@ -1197,9 +1135,7 @@ function renderCells() {
       else if (sameCell(app.current, [r, c])) state = 'st-current';
       else if (inQueue.has(k)) state = 'st-queue';
       else if (d >= 0) state = 'st-done';
-      let cls = `cell t-${type}`;
-      if (state) cls += ` ${state}`;
-      if (sameCell(next, [r, c])) cls += ' st-next';
+      const cls = `cell t-${type}${state ? ` ${state}` : ''}`;
       const ce = cellEls[r][c];
       if (ce.el.className !== cls) ce.el.className = cls;
       if (state === 'st-path') ce.el.style.setProperty('--i', pathIdx.get(k));
@@ -1220,16 +1156,16 @@ function renderQueue() {
     li.textContent = text;
     ol.appendChild(li);
   };
-  if (!app.bfs) { addEmpty('탐색을 시작하면 큐에 들어간 칸이 여기에 보여요.'); return; }
+  if (!app.bfs) { addEmpty('실행하면 큐에 들어간 칸이 여기에 보여요.'); return; }
   const queue = app.bfs.getQueue();
   if (!queue.length) { addEmpty('(비어 있음)'); return; }
-  const n = app.size;
-  const fresh = new Set(app.lastAdded.map(([r, c]) => r * n + c));
+  const cols = app.cols;
+  const fresh = new Set(app.lastAdded.map(([r, c]) => r * cols + c));
   queue.forEach((cell, i) => {
     const li = document.createElement('li');
     li.textContent = fmt(cell);
     if (i === 0 && !app.outcome) li.classList.add('front');
-    if (fresh.has(cell[0] * n + cell[1])) li.classList.add('new');
+    if (fresh.has(cell[0] * cols + cell[1])) li.classList.add('new');
     ol.appendChild(li);
   });
 }
@@ -1243,12 +1179,14 @@ function renderStats() {
 
 function renderButtons() {
   const finished = !!app.bfs && app.bfs.isFinished();
-  ui.stepBtn.disabled = finished;
+  let label = '▶ 실행';
+  if (app.timer) label = '⏸ 일시정지';
+  else if (finished) label = '↻ 다시 실행';
+  else if (app.bfs) label = '▶ 이어서 실행';
+  ui.runBtn.textContent = label;
+  ui.runBtn.classList.toggle('playing', !!app.timer);
   ui.skipBtn.disabled = finished;
-  ui.autoBtn.disabled = finished;
   ui.resetBtn.disabled = !app.bfs;
-  ui.autoBtn.textContent = app.timer ? '일시정지 ⏸' : '자동 실행 ⏵';
-  ui.autoBtn.classList.toggle('playing', !!app.timer);
 }
 
 function render() {
@@ -1258,10 +1196,11 @@ function render() {
   renderButtons();
 }
 
-// 설명 카드의 "물결" 그림: 가운데에서의 거리를 색으로
+// ---------- 원리 설명의 작은 그림 ----------
+// "물결" 그림: 가운데(출발점)에서의 거리를 색의 진하기로
 function renderWaveDemo() {
   const box = $('#waveDemo');
-  const shades = ['#34b864', '#7fd8c0', '#a8e6d5', '#cdf2e7', '#e8faf4'];
+  const shades = ['#22c55e', '#86dcc6', '#b0e9da', '#d3f4ec', '#ecfaf6'];
   for (let r = 0; r < 5; r++) {
     for (let c = 0; c < 5; c++) {
       const d = Math.abs(r - 2) + Math.abs(c - 2);
@@ -1273,6 +1212,105 @@ function renderWaveDemo() {
     }
   }
 }
+// 작은 격자 그림: data-grid의 행은 '/', 칸은 공백으로 나눈다.
+// 칸 기호 → S 출발점, E 출구, W 장애물(불), m 경로 위 연기, p 경로, g 안전한 길, . 빈 칸
+const MINI_ICON = { S: '🧍', E: '🚪', W: '🔥', m: '💨' };
+function renderMiniGrids() {
+  document.querySelectorAll('.mini[data-grid]').forEach((box) => {
+    const rows = box.dataset.grid.trim().split('/').map((row) => row.trim().split(/\s+/));
+    box.style.gridTemplateColumns = `repeat(${rows[0].length}, 24px)`;
+    rows.flat().forEach((tok) => {
+      const i = document.createElement('i');
+      if (tok !== '.') i.className = `k-${tok[0]}`;
+      i.textContent = tok.slice(1) || MINI_ICON[tok[0]] || '';
+      box.appendChild(i);
+    });
+  });
+}
+
+// ---------- 테스트와 검증 (createBFS를 직접 실행해 예상 결과와 비교) ----------
+function runToEnd(bfs) {
+  let res;
+  let last = null;
+  let guard = 1000;
+  while (guard-- > 0 && (res = bfs.step())) {
+    last = res;
+    if (res.type !== 'expand') break;
+  }
+  return last;
+}
+const outcomeText = (res) => (res.type === 'found' ? `${fmtShort(res.cell)}까지 ${res.dist}칸` : `경로 없음 (도달 가능 ${res.reachable}칸)`);
+const inputText = (m) => `${m.rows}×${m.cols} · 출발 ${fmtShort(m.start)} · 출구 ${m.exits.map(fmtShort).join(' ')} · 장애물 ${m.walls.length}개`;
+
+// 지도 하나를 끝까지 탐색해서 예상과 비교하는 테스트
+function mapTest(m, name = m.name) {
+  return {
+    name, input: inputText(m), expect: m.expectText, reason: m.reason, load: m,
+    run() {
+      const res = runToEnd(createBFS(m.rows, m.cols, m.walls, m.start, m.exits));
+      let actual = outcomeText(res);
+      if (m.expect.via && res.type === 'found') actual += ` · ${fmtShort(m.expect.via)} 경유 ${res.path.some((p) => sameCell(p, m.expect.via)) ? 'O' : 'X'}`;
+      return { actual, ok: matchesExpect(m.expect, res) };
+    },
+  };
+}
+
+const TESTS = [
+  ...EXAMPLES.map((ex) => mapTest(ex)),
+  {
+    name: '큐 변화 추적', input: '① 기본 예시의 처음 3단계',
+    expect: '[(1,0),(0,1)] → [(0,1),(2,0),(1,1)] → [(2,0),(1,1),(0,2)]',
+    reason: '이웃을 위→아래→왼쪽→오른쪽 순서로 넣으며 손으로 따라가 봄', load: EXAMPLES[0],
+    run() {
+      const ex = EXAMPLES[0];
+      const bfs = createBFS(ex.rows, ex.cols, ex.walls, ex.start, ex.exits);
+      const snaps = [];
+      for (let k = 0; k < 3; k++) { bfs.step(); snaps.push(`[${bfs.getQueue().map(fmtShort).join(',')}]`); }
+      const actual = snaps.join(' → ');
+      return { actual, ok: actual === this.expect };
+    },
+  },
+  {
+    name: '출발점 = 출구', input: '5×5 · 출발점과 출구가 모두 (2,2)', expect: '거리 0칸 (1단계에서 끝)',
+    reason: '첫 칸(출발점)을 꺼내자마자 출구이므로 이동 0칸',
+    run() {
+      const res = createBFS(5, 5, [], [2, 2], [[2, 2]]).step();
+      const ok = res.type === 'found' && res.dist === 0 && res.steps === 1 && res.path.length === 1;
+      return { actual: `${outcomeText(res)} (${res.steps}단계에서 끝)`, ok };
+    },
+  },
+  mapTest(ENCLOSED, '출발점이 갇힘 (예외)'),
+];
+
+function renderTests() {
+  ui.testBody.textContent = '';
+  let pass = 0;
+  TESTS.forEach((t, i) => {
+    let out;
+    try { out = t.run(); } catch (err) { out = { actual: `오류: ${err.message}`, ok: false }; }
+    if (out.ok) pass++;
+    const tr = document.createElement('tr');
+    const td = (html, cls) => { const e = document.createElement('td'); if (cls) e.className = cls; e.innerHTML = html; tr.appendChild(e); return e; };
+    td(String(i + 1));
+    td(`<span class="t-name">${t.name}</span><small>${t.input}</small>`);
+    td(`<b>${t.expect}</b><small>${t.reason}</small>`);
+    td(out.actual);
+    td(out.ok ? '✓' : '✗', out.ok ? 'ok' : 'ok no');
+    const last = td('');
+    if (t.load) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'link-btn';
+      b.textContent = '지도에서 보기';
+      b.addEventListener('click', () => { loadExample(t.load); window.scrollTo({ top: 0 }); });
+      last.appendChild(b);
+    }
+    ui.testBody.appendChild(tr);
+  });
+  const allOk = pass === TESTS.length;
+  ui.testSummary.textContent = allOk ? `${TESTS.length}개 모두 통과` : `${TESTS.length - pass}개 불일치`;
+  ui.testSummary.classList.toggle('fail', !allOk);
+}
 
 // ---------- 입력 연결 ----------
 function cellFromPoint(x, y) {
@@ -1283,24 +1321,20 @@ function editAt(cellEl) {
   if (!cellEl || !ui.board.contains(cellEl)) return;
   if (applyTool(+cellEl.dataset.r, +cellEl.dataset.c)) mapChanged();
 }
-function stopPainting() {
-  app.painting = false;
-}
 
 function bindEvents() {
-  document.querySelectorAll('.tool').forEach((b) => b.addEventListener('click', () => setTool(b.dataset.tool)));
-  document.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => setSize(+b.dataset.size)));
+  document.querySelectorAll('[data-tool]').forEach((b) => b.addEventListener('click', () => setTool(b.dataset.tool)));
+  ui.rowsSel.addEventListener('change', () => setSize(+ui.rowsSel.value, app.cols));
+  ui.colsSel.addEventListener('change', () => setSize(app.rows, +ui.colsSel.value));
+  ui.randomBtn.addEventListener('click', randomMap);
   ui.clearBtn.addEventListener('click', clearAll);
-
-  ui.stepBtn.addEventListener('click', () => { stopAuto(); advance(); render(); });
-  ui.autoBtn.addEventListener('click', toggleAuto);
+  ui.runBtn.addEventListener('click', onRunClick);
   ui.skipBtn.addEventListener('click', skipToEnd);
   ui.resetBtn.addEventListener('click', () => {
     resetSearch();
-    setStatus('info', '↺ 탐색을 초기화했어요. 지도는 그대로예요.');
+    idle('↺ 탐색을 초기화했어요. 지도는 그대로예요.');
     render();
   });
-  ui.speed.addEventListener('input', updateSpeedLabel);
 
   // 마우스·터치로 칸 편집 (장애물·지우개는 드래그로 여러 칸)
   ui.board.addEventListener('pointerdown', (e) => {
@@ -1311,21 +1345,22 @@ function bindEvents() {
     app.painting = app.tool === 'wall' || app.tool === 'erase';
     editAt(cellEl);
   });
-  window.addEventListener('pointermove', (e) => {
-    if (app.painting) editAt(cellFromPoint(e.clientX, e.clientY));
-  });
+  window.addEventListener('pointermove', (e) => { if (app.painting) editAt(cellFromPoint(e.clientX, e.clientY)); });
+  const stopPainting = () => { app.painting = false; };
   window.addEventListener('pointerup', stopPainting);
   window.addEventListener('pointercancel', stopPainting);
   window.addEventListener('blur', stopPainting);
 }
 
 function init() {
-  buildExampleButtons();
+  buildSizeSelects();
+  buildExampleSelect();
   renderWaveDemo();
+  renderMiniGrids();
   bindEvents();
   setTool('wall');
-  updateSpeedLabel();
   loadExample(EXAMPLES[0]);                                 // 처음에는 ① 기본 예시를 띄워 둔다
+  renderTests();
 }
 
 init();
